@@ -1,18 +1,309 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
+// prisma/schema.prisma  (Prisma 7 · Neon Postgres · Cloudinary for files)
+// The connection URL is NOT here. It lives in prisma.config.ts (DIRECT_URL for migrations)
+// and in the driver adapter (@prisma/adapter-neon, pooled DATABASE_URL) at runtime.
 
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
 }
 
-// datasource db {
-//   provider = "postgresql"
-// }
-
-// prisma/schema.prisma
 datasource db {
-  provider  = "postgresql"
+  provider = "postgresql"
+}
+
+// ═══════════════════════════ ENUMS ═══════════════════════════
+// Rule: enum = fixed values your code branches on.
+// Admin-editable lists (categories, technologies, social platforms) are tables/strings instead.
+
+enum PublishStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  DOCUMENT // CV pdf
+}
+
+enum MediaProvider {
+  CLOUDINARY
+  YOUTUBE
+  VIMEO
+  EXTERNAL
+}
+
+enum ProjectMediaRole {
+  SCREENSHOT
+  DIAGRAM
+  DEMO
+}
+
+enum TechCategory {
+  FRONTEND
+  BACKEND
+  FRAMEWORK
+  DATABASE
+  CSS_FRAMEWORK
+  DESIGN_TOOL
+  SERVICE // Clerk, Stripe, Resend, Vercel...
+  TOOL
+}
+
+enum EducationType {
+  DEGREE
+  DIPLOMA
+  CERTIFICATE // a qualification level (e.g. NVQ certificate). Proof-image certificates use the Certificate model
+  TRAINING
+  SCHOOL
+}
+
+enum CertificateCategory {
+  ACADEMIC
+  DIGITAL
+}
+
+enum EmailStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+// ═══════════════════════════ ADMIN ═══════════════════════════
+// Only for a self-built login (Fastify + JWT/cookie). DELETE this model if you use Clerk/Auth.js.
+// Single admin: seed one row, never build a sign-up route.
+
+model Admin {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ═══════════════════════════ MEDIA (Cloudinary) ═══════════════════════════
+// Only place that knows about Cloudinary. Every image/video/PDF in the app points here.
+// Delete flow: delete the DB row FIRST (it may be refused by Restrict), THEN call
+// cloudinary.uploader.destroy(publicId, { resource_type }). If Cloudinary fails you only leave an
+// unused file behind; the other order can leave a live page pointing at a deleted image.
+// Orphans (Media rows nothing points to) are swept by a cleanup job: see README/service notes.
+// YouTube/Vimeo links: provider != CLOUDINARY, publicId = null, nothing to delete remotely.
+
+model Media {
+  id           String        @id @default(cuid())
+  type         MediaType
+  provider     MediaProvider @default(CLOUDINARY)
+  url          String // Cloudinary secure_url (or the YouTube/Vimeo link)
+  publicId     String? // Cloudinary public_id, needed to delete
+  resourceType String? // Cloudinary resource_type: "image" | "video" | "raw" (delete needs it)
+  thumbnailUrl String? // poster image for videos
+  sizeBytes    Int?
+  width        Int?
+  height       Int?
+  alt          String?
+  createdAt    DateTime      @default(now())
+
+  projectThumbnails Project[]      @relation("ProjectThumbnail")
+  projectMedia      ProjectMedia[]
+  certificates      Certificate[]
+  settingsProfile   SiteSettings[] @relation("SettingsProfileImage")
+  settingsHover     SiteSettings[] @relation("SettingsHoverImage")
+  settingsAbout     SiteSettings[] @relation("SettingsAboutImage")
+  settingsCv        SiteSettings[] @relation("SettingsCv")
+
+  @@unique([provider, publicId]) // no duplicate Cloudinary assets (NULLs are allowed repeatedly)
+}
+
+// ═══════════════════════════ PROJECTS ═══════════════════════════
+
+model ProjectCategory {
+  id        String    @id @default(cuid())
+  name      String    @unique // Healthcare, E-Commerce, Academic, AI...
+  slug      String    @unique
+  sortOrder Int       @default(0)
+  projects  Project[]
+}
+
+// One table for BOTH project tag chips and the Skills section (showInSkills = true).
+model Technology {
+  id           String       @id @default(cuid())
+  name         String       @unique // React, Prisma, Clerk...
+  category     TechCategory
+  icon         String? // icon key like "react", not an uploaded file
+  showInSkills Boolean      @default(false)
+  sortOrder    Int          @default(0)
+  projects     Project[] // implicit many-to-many
+}
+
+model Project {
+  id               String        @id @default(cuid())
+  slug             String        @unique
+  title            String
+  shortDescription String // card text
+  description      String // full text (markdown)
+  status           PublishStatus @default(DRAFT)
+  featured         Boolean       @default(false) // show on home page
+  sortOrder        Int           @default(0)
+
+  githubUrl String?
+  liveUrl   String?
+
+  // Details section (academic/older projects use more of these; all optional)
+  methodology        String?
+  aim                String?
+  objectives         String[]
+  features           String[]
+  skillsDemonstrated String[]
+  startedAt          DateTime?
+  completedAt        DateTime?
+
+  categoryId  String?
+  category    ProjectCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  thumbnailId String?
+  thumbnail   Media?           @relation("ProjectThumbnail", fields: [thumbnailId], references: [id], onDelete: SetNull)
+
+  technologies Technology[] // tag chips
+  media        ProjectMedia[] // screenshots, diagrams, demo video
+  phases       ProjectPhase[] // Gantt rows
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Join table: one project has many media; each link has a role, tab group, caption and order.
+model ProjectMedia {
+  id        String           @id @default(cuid())
+  projectId String
+  project   Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  mediaId   String
+  media     Media            @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  role      ProjectMediaRole
+  group     String? // "Client-side" / "Admin-side" tabs
+  caption   String?
+  sortOrder Int              @default(0)
+
+  @@unique([projectId, mediaId, role])
+}
+
+model ProjectPhase {
+  id        String    @id @default(cuid())
+  projectId String
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String // Requirements Gathering
+  tasks     String[]
+  startDate DateTime?
+  endDate   DateTime?
+  sortOrder Int       @default(0)
+}
+
+// ═══════════════════════════ EDUCATION / EXPERIENCE / CERTIFICATES ═══════════════════════════
+
+// Years only (academic entries are shown as "2021 – 2024"). endYear = null means ongoing.
+model Education {
+  id          String        @id @default(cuid())
+  title       String
+  institution String
+  type        EducationType
+  startYear   Int
+  endYear     Int?
+  grade       String? // "Merit", "Lower Second Class Honours"
+  description String?
+  showOnHome  Boolean       @default(false)
+  isVisible   Boolean       @default(true)
+  sortOrder   Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+// endDate = null means current position (no separate isCurrent flag to keep in sync).
+model Experience {
+  id          String    @id @default(cuid())
+  role        String
+  company     String
+  location    String?
+  startDate   DateTime
+  endDate     DateTime?
+  description String?
+  isVisible   Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Certificate {
+  id            String              @id @default(cuid())
+  title         String
+  issuer        String
+  category      CertificateCategory
+  issuedAt      DateTime?
+  credentialUrl String? // verification link
+  imageId       String
+  image         Media               @relation(fields: [imageId], references: [id], onDelete: Restrict)
+  isVisible     Boolean             @default(true)
+  sortOrder     Int                 @default(0)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+}
+
+// ═══════════════════════════ CONTACT MESSAGES ═══════════════════════════
+// Flow: validate -> INSERT (emailStatus PENDING) -> send notification email -> UPDATE SENT/FAILED.
+// The row is the source of truth, so a failed email never loses a message.
+
+model Message {
+  id          String      @id @default(cuid())
+  name        String
+  email       String
+  subject     String?
+  body        String
+  isRead      Boolean     @default(false)
+  isArchived  Boolean     @default(false)
+  emailStatus EmailStatus @default(PENDING)
+  repliedAt   DateTime?
+  createdAt   DateTime    @default(now())
+}
+
+// ═══════════════════════════ SITE SETTINGS ═══════════════════════════
+// Single row. Always upsert with id = 1. Never create a second row.
+// Prisma cannot enforce id = 1 by itself; the app only ever calls upsert({ where: { id: 1 } }).
+// (Optional hard guard: add a CHECK (id = 1) constraint in a raw SQL migration.)
+
+model SiteSettings {
+  id Int @id @default(1)
+
+  ownerName              String
+  roles                  String[] // ["Full Stack Developer", "Software Engineer"]
+  heroIntro              String?
+  aboutText              String? // markdown
+  // shown when there is no experience: "Willing to kick start my career with an internship"
+  experienceFallbackText String?
+
+  phone   String?
+  email   String?
+  address String?
+
+  seoTitle       String?
+  seoDescription String?
+
+  showExperience   Boolean @default(true)
+  showCertificates Boolean @default(true)
+
+  profileImageId String?
+  profileImage   Media?  @relation("SettingsProfileImage", fields: [profileImageId], references: [id], onDelete: SetNull)
+  hoverImageId   String?
+  hoverImage     Media?  @relation("SettingsHoverImage", fields: [hoverImageId], references: [id], onDelete: SetNull)
+  aboutImageId   String?
+  aboutImage     Media?  @relation("SettingsAboutImage", fields: [aboutImageId], references: [id], onDelete: SetNull)
+  cvId           String?
+  cv             Media?  @relation("SettingsCv", fields: [cvId], references: [id], onDelete: SetNull)
+
+  updatedAt DateTime @updatedAt
+}
+
+model SocialLink {
+  id        String  @id @default(cuid())
+  platform  String // "github", "linkedin", "instagram" (string so new ones need no migration)
+  url       String
+  isVisible Boolean @default(true)
+  sortOrder Int     @default(0)
 }
