@@ -74,12 +74,14 @@ enum EmailStatus {
 // Single admin: seed one row, never build a sign-up route.
 
 model Admin {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  name         String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String   @id @default(cuid())
+  email          String   @unique
+  passwordHash   String
+  name           String?
+  profileImageId String?
+  profileImage   Media?   @relation("AdminProfileImage", fields: [profileImageId], references: [id], onDelete: SetNull)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 // ═══════════════════════════ MEDIA (Cloudinary) ═══════════════════════════
@@ -111,6 +113,7 @@ model Media {
   settingsHover     SiteSettings[] @relation("SettingsHoverImage")
   settingsAbout     SiteSettings[] @relation("SettingsAboutImage")
   settingsCv        SiteSettings[] @relation("SettingsCv")
+  adminProfile      Admin[]        @relation("AdminProfileImage")
 
   @@unique([provider, publicId]) // no duplicate Cloudinary assets (NULLs are allowed repeatedly)
 }

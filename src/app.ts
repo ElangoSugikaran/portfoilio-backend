@@ -4,6 +4,13 @@ import helmet from "@fastify/helmet";
 import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import prismaPlugin from "./plugins/prisma.js";
+import authPlugin from "./plugins/auth.js";
+import { authRoutes } from "./modules/auth/routes.js";
+import { skillsRoutes } from "./modules/skills/routes.js";
+import { experienceRoutes } from "./modules/experience/routes.js";
+import { certificatesRoutes } from "./modules/certificates/routes.js";
+import { projectRoutes } from "./modules/project/routes.js";
+import { settingsRoutes } from "./modules/settings/routes.js";
 
 export async function buildApp() {
   const app = Fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
@@ -14,10 +21,30 @@ export async function buildApp() {
 
   // Register security plugins
   await app.register(helmet);
-  await app.register(cors, { origin: "*" });
+  await app.register(cors, { origin: true, credentials: true });
 
   // 🔌 Register the Database Connection
   await app.register(prismaPlugin);
+
+  // 🔐 Register Auth Plugin
+  await app.register(authPlugin);
+
+  // 🚀 Register Routes (API v1)
+  await app.register(authRoutes, { prefix: '/api/v1/auth' });
+  await app.register(skillsRoutes, { prefix: '/api/v1/skills' });
+  await app.register(experienceRoutes, { prefix: '/api/v1/experience' });
+  await app.register(certificatesRoutes, { prefix: '/api/v1/certificates' });
+  await app.register(projectRoutes, { prefix: '/api/v1/projects' });
+  await app.register(settingsRoutes, { prefix: '/api/v1/settings' });
+
+  // Root route so localhost:8000 doesn't return 404
+  app.get("/", async () => {
+    return { 
+      message: "Welcome to the Portfolio Backend API", 
+      version: "v1", 
+      docs: "/api/v1/docs (if Swagger is enabled)" 
+    };
+  });
 
   // Basic health-check route
   app.get("/health", async () => {
