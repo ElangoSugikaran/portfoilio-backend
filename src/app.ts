@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
+import fastifyMultipart from "@fastify/multipart";
 import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import prismaPlugin from "./plugins/prisma.js";
@@ -11,6 +12,7 @@ import { experienceRoutes } from "./modules/experience/routes.js";
 import { certificatesRoutes } from "./modules/certificates/routes.js";
 import { projectRoutes } from "./modules/project/routes.js";
 import { settingsRoutes } from "./modules/settings/routes.js";
+import { mediaRoutes } from "./modules/media/routes.js";
 
 export async function buildApp() {
   const app = Fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
@@ -22,6 +24,9 @@ export async function buildApp() {
   // Register security plugins
   await app.register(helmet);
   await app.register(cors, { origin: true, credentials: true });
+  await app.register(fastifyMultipart, {
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  });
 
   // 🔌 Register the Database Connection
   await app.register(prismaPlugin);
@@ -36,6 +41,7 @@ export async function buildApp() {
   await app.register(certificatesRoutes, { prefix: '/api/v1/certificates' });
   await app.register(projectRoutes, { prefix: '/api/v1/projects' });
   await app.register(settingsRoutes, { prefix: '/api/v1/settings' });
+  await app.register(mediaRoutes, { prefix: '/api/v1/media' });
 
   // Root route so localhost:8000 doesn't return 404
   app.get("/", async () => {

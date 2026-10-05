@@ -6,6 +6,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url("DATABASE_URL must be a valid URL"),
   PORT: z.string().default("8000").transform(Number),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+  CLOUDINARY_URL: z.string().url("CLOUDINARY_URL must be a valid URL starting with cloudinary://"),
   JWT_SECRET: z.string().min(32, "JWT secret must be at least 32 characters"),
   COOKIE_SECRET: z.string().min(32, "COOKIE secret must be at least 32 characters"),
 });
