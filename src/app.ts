@@ -23,7 +23,12 @@ export async function buildApp() {
 
   // Register security plugins
   await app.register(helmet);
-  await app.register(cors, { origin: true, credentials: true });
+  await app.register(cors, {
+    origin: true,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']
+  });
+
   await app.register(fastifyMultipart, {
     limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   });
@@ -45,10 +50,10 @@ export async function buildApp() {
 
   // Root route so localhost:8000 doesn't return 404
   app.get("/", async () => {
-    return { 
-      message: "Welcome to the Portfolio Backend API", 
-      version: "v1", 
-      docs: "/api/v1/docs (if Swagger is enabled)" 
+    return {
+      message: "Welcome to the Portfolio Backend API",
+      version: "v1",
+      docs: "/api/v1/docs (if Swagger is enabled)"
     };
   });
 
