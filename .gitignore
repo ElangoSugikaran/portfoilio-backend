@@ -7,3 +7,9 @@ documentation/
 .claude
 .windsurf
 prisma/scripts/
+
+# Prisma Scripts
+prisma/scripts/
+
+# Prisma Generated Client
+src/generated/
