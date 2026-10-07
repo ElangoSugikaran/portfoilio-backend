@@ -4,7 +4,7 @@
 
 generator client {
   provider = "prisma-client"
-  
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -212,6 +212,7 @@ model Education {
   endYear     Int?
   grade       String? // "Merit", "Lower Second Class Honours"
   description String?
+  icon        String?
   showOnHome  Boolean       @default(false)
   isVisible   Boolean       @default(true)
   sortOrder   Int           @default(0)
@@ -228,6 +229,7 @@ model Experience {
   startDate   DateTime
   endDate     DateTime?
   description String?
+  icon        String?
   isVisible   Boolean   @default(true)
   sortOrder   Int       @default(0)
   createdAt   DateTime  @default(now())

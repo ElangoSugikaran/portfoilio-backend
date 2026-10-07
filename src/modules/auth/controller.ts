@@ -9,7 +9,7 @@ export class AuthController {
     this.service = new AuthService(fastify);
   }
 
-  login = async (request: FastifyRequest<any>, reply: FastifyReply) => {
+  login = async (request: FastifyRequest<{ Body: LoginInput }>, reply: FastifyReply) => {
     try {
       const { admin, token } = await this.service.login(request.body);
 
@@ -38,7 +38,7 @@ export class AuthController {
     reply.send({ success: true, admin: request.user });
   }
 
-  updatePassword = async (request: FastifyRequest<any>, reply: FastifyReply) => {
+  updatePassword = async (request: FastifyRequest<{ Body: UpdatePasswordInput }>, reply: FastifyReply) => {
     try {
       const adminId = (request.user as any).id;
       await this.service.updatePassword(adminId, request.body);
@@ -48,7 +48,7 @@ export class AuthController {
     }
   };
 
-  updateProfile = async (request: FastifyRequest<any>, reply: FastifyReply) => {
+  updateProfile = async (request: FastifyRequest<{ Body: UpdateProfileInput }>, reply: FastifyReply) => {
     try {
       const adminId = (request.user as any).id;
       const updatedAdmin = await this.service.updateProfile(adminId, request.body);
