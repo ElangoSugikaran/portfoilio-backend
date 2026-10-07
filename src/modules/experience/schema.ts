@@ -7,6 +7,7 @@ export const createExperienceSchema = z.object({
   startDate: z.coerce.date(),
   endDate: z.coerce.date().optional().nullable(),
   description: z.string().optional().nullable(),
+  icon: z.string().optional().nullable(),
   isVisible: z.boolean().default(true),
   sortOrder: z.number().int().default(0)
 });
