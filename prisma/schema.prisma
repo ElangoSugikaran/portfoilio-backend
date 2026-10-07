@@ -208,8 +208,8 @@ model Education {
   title       String
   institution String
   type        EducationType
-  startYear   Int
-  endYear     Int?
+  startDate   String @default("2023")
+  endDate     String?
   grade       String? // "Merit", "Lower Second Class Honours"
   description String?
   icon        String?

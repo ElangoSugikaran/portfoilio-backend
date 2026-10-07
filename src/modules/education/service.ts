@@ -8,7 +8,7 @@ export class EducationService {
     return await (this.fastify as any).prisma.education.findMany({
       orderBy: [
         { sortOrder: 'asc' },
-        { startYear: 'desc' }
+        { startDate: 'desc' }
       ]
     });
   }
