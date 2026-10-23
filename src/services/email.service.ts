@@ -8,14 +8,14 @@ export class EmailService {
     this.resend = new Resend(env.RESEND_API_KEY);
   }
 
-  async sendContactNotification(data: { name: string; email: string; subject?: string; body: string }) {
+  async sendContactNotification(data: { name: string; email: string; subject?: string | undefined; body: string }) {
     const { name, email, subject, body } = data;
     
     try {
       const response = await this.resend.emails.send({
         from: 'Portfolio Contact Form <onboarding@resend.dev>', // Update this to your verified domain in production
         to: env.CONTACT_EMAIL_TO,
-        reply_to: email,
+        replyTo: email,
         subject: `New Contact Message: ${subject || 'No Subject'}`,
         html: `
           <h2>New Message from ${name}</h2>

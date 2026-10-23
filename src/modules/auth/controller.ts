@@ -4,9 +4,11 @@ import type { LoginInput, UpdatePasswordInput, UpdateProfileInput } from './sche
 
 export class AuthController {
   private service: AuthService;
+  private fastify: any;
 
   constructor(fastify: any) {
     this.service = new AuthService(fastify);
+    this.fastify = fastify;
   }
 
   login = async (request: FastifyRequest<{ Body: LoginInput }>, reply: FastifyReply) => {
@@ -19,12 +21,19 @@ export class AuthController {
           path: '/',
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
+          sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
           maxAge: 7 * 24 * 60 * 60 // 7 days
         })
         .send({ success: true, admin, token });
     } catch (error: any) {
-      reply.status(401).send({ success: false, message: error.message || 'Authentication failed' });
+      if (error.message === 'Invalid credentials') {
+        return reply.status(401).send({ success: false, message: 'Invalid credentials' });
+      }
+      request.log.error(error, 'Error during login');
+      reply.status(500).send({ 
+        success: false, 
+        message: 'Database or server error during login. Please try again.' 
+      });
     }
   };
 
@@ -34,9 +43,18 @@ export class AuthController {
       .send({ success: true, message: 'Logged out successfully' });
   };
   
-  me = async (request: FastifyRequest, reply: FastifyReply) => {
-    reply.send({ success: true, admin: request.user });
-  }
+  getProfile = async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const adminId = (request.user as any).id;
+      const admin = await this.service.getProfile(adminId);
+      if (!admin) {
+        return reply.status(404).send({ success: false, message: 'Admin not found' });
+      }
+      reply.send({ success: true, admin });
+    } catch (error: any) {
+      reply.status(500).send({ success: false, message: error.message });
+    }
+  };
 
   updatePassword = async (request: FastifyRequest<{ Body: UpdatePasswordInput }>, reply: FastifyReply) => {
     try {
@@ -54,7 +72,7 @@ export class AuthController {
       const updatedAdmin = await this.service.updateProfile(adminId, request.body);
       
       // Re-sign token if email changed (since email is in the JWT payload)
-      const newToken = (this as any).service.fastify.jwt.sign({ 
+      const newToken = this.fastify.jwt.sign({ 
         id: updatedAdmin.id, 
         email: updatedAdmin.email 
       });
@@ -64,7 +82,7 @@ export class AuthController {
           path: '/',
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
+          sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
           maxAge: 7 * 24 * 60 * 60 
         })
         .send({ success: true, admin: updatedAdmin, token: newToken });

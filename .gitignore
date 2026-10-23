@@ -6,8 +6,6 @@ documentation/
 .agents
 .claude
 .windsurf
-prisma/scripts/
-
 # Prisma Scripts
 prisma/scripts/
 

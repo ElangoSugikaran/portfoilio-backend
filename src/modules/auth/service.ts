@@ -7,7 +7,8 @@ export class AuthService {
 
   async login(input: LoginInput) {
     const admin = await (this.fastify as any).prisma.admin.findUnique({
-      where: { email: input.email }
+      where: { email: input.email },
+      include: { profileImage: true }
     });
 
     if (!admin) {
@@ -26,9 +27,32 @@ export class AuthService {
     });
 
     return { 
-      admin: { id: admin.id, email: admin.email, name: admin.name }, 
+      admin: { 
+        id: admin.id, 
+        email: admin.email, 
+        name: admin.name,
+        profileImageId: admin.profileImageId,
+        profileImage: admin.profileImage 
+      }, 
       token 
     };
+  }
+
+  async getProfile(adminId: string) {
+    const admin = await (this.fastify as any).prisma.admin.findUnique({
+      where: { id: adminId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        profileImageId: true,
+        profileImage: true,
+        createdAt: true,
+        updatedAt: true,
+      }
+    });
+
+    return admin;
   }
 
   async updatePassword(adminId: string, input: UpdatePasswordInput) {
@@ -56,14 +80,27 @@ export class AuthService {
   }
 
   async updateProfile(adminId: string, input: UpdateProfileInput) {
+    const data: any = {};
+    if (input.email !== undefined) data.email = input.email;
+    if (input.name !== undefined) data.name = input.name;
+    if (input.profileImageId !== undefined) {
+      data.profileImageId = input.profileImageId;
+    }
+
     const admin = await (this.fastify as any).prisma.admin.update({
       where: { id: adminId },
-      data: {
-        email: input.email,
-        name: input.name
+      data,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        profileImageId: true,
+        profileImage: true,
+        createdAt: true,
+        updatedAt: true,
       }
     });
 
-    return { id: admin.id, email: admin.email, name: admin.name };
+    return admin;
   }
 }

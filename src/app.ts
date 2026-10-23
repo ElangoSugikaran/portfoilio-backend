@@ -15,6 +15,7 @@ import { settingsRoutes } from "./modules/settings/routes.js";
 import { mediaRoutes } from "./modules/media/routes.js";
 import { educationRoutes } from "./modules/education/routes.js";
 import { messageRoutes } from "./modules/messages/routes.js";
+import { dashboardRoutes } from "./modules/dashboard/routes.js";
 
 export async function buildApp() {
   const app = Fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
@@ -51,6 +52,7 @@ export async function buildApp() {
   await app.register(mediaRoutes, { prefix: '/api/v1/media' });
   await app.register(educationRoutes, { prefix: '/api/v1/education' });
   await app.register(messageRoutes, { prefix: '/api/v1/messages' });
+  await app.register(dashboardRoutes, { prefix: '/api/v1/dashboard' });
 
   // Root route so localhost:8000 doesn't return 404
   app.get("/", async () => {

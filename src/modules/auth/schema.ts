@@ -17,7 +17,7 @@ export type UpdatePasswordInput = z.infer<typeof updatePasswordSchema>;
 export const updateProfileSchema = z.object({
   email: z.string().email("Invalid email format").optional(),
   name: z.string().optional(),
-  profileImageId: z.string().cuid("Invalid image ID").optional()
+  profileImageId: z.string().nullable().optional()
 });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
