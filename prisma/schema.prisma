@@ -225,6 +225,7 @@ model Experience {
   id          String    @id @default(cuid())
   role        String
   company     String
+  companyUrl  String?
   location    String?
   startDate   DateTime
   endDate     DateTime?
