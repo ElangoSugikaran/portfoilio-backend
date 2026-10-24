@@ -1,11 +1,14 @@
-import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { EducationService } from './service.js';
 import type { CreateEducationInput, UpdateEducationInput } from './schema.js';
 
+/**
+ * Controller handling HTTP requests and responses for Education history.
+ */
 export class EducationController {
   private service: EducationService;
 
-  constructor(fastify: any) {
+  constructor(fastify: FastifyInstance) {
     this.service = new EducationService(fastify);
   }
 
@@ -33,7 +36,11 @@ export class EducationController {
   create = async (request: FastifyRequest<{ Body: CreateEducationInput }>, reply: FastifyReply) => {
     try {
       const education = await this.service.create(request.body);
-      reply.status(201).send({ success: true, data: education });
+      reply.status(201).send({ 
+        success: true, 
+        message: 'Education entry created successfully', 
+        data: education 
+      });
     } catch (error: any) {
       reply.status(500).send({ success: false, code: 'INTERNAL_SERVER_ERROR', message: error.message });
     }
@@ -42,7 +49,11 @@ export class EducationController {
   update = async (request: FastifyRequest<{ Params: { id: string }, Body: UpdateEducationInput }>, reply: FastifyReply) => {
     try {
       const education = await this.service.update(request.params.id, request.body);
-      reply.send({ success: true, data: education });
+      reply.send({ 
+        success: true, 
+        message: 'Education entry updated successfully', 
+        data: education 
+      });
     } catch (error: any) {
       if (error.code === 'P2025') {
         return reply.status(404).send({ success: false, code: 'NOT_FOUND', message: 'Education not found' });

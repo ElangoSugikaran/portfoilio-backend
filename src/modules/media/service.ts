@@ -1,16 +1,22 @@
 import type { FastifyInstance } from 'fastify';
+import type { MultipartFile } from '@fastify/multipart';
+import type { UploadApiResponse } from 'cloudinary';
 import { PrismaClient, MediaType } from '../../generated/prisma/client.js';
 import { cloudinary } from '../../lib/cloudinary.js';
 import sharp from 'sharp';
 
+/**
+ * Service managing media file compression (Sharp), Cloudinary upload/deletion,
+ * and Media database records.
+ */
 export class MediaService {
   private prisma: PrismaClient;
 
-  constructor(fastify: any) {
+  constructor(fastify: FastifyInstance) {
     this.prisma = fastify.prisma;
   }
 
-  async uploadFile(file: any): Promise<any> {
+  async uploadFile(file: MultipartFile) {
     const isImage = file.mimetype.startsWith('image/');
     const isVideo = file.mimetype.startsWith('video/');
     
@@ -30,18 +36,16 @@ export class MediaService {
       resourceType = 'video';
       mediaType = 'VIDEO';
     } else if (file.mimetype === 'application/pdf') {
-      // Cloudinary treats pdfs as images if you want thumbnails, but raw if you just want storage. 
-      // We will use raw to ensure it downloads correctly as a document.
       resourceType = 'raw';
       mediaType = 'DOCUMENT';
     }
 
     // Upload to Cloudinary via stream
-    const uploadResult: any = await new Promise((resolve, reject) => {
+    const uploadResult = await new Promise<UploadApiResponse>((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
         { resource_type: resourceType, folder: 'portfolio' },
         (error, result) => {
-          if (error) return reject(error);
+          if (error || !result) return reject(error || new Error('Upload failed'));
           resolve(result);
         }
       );

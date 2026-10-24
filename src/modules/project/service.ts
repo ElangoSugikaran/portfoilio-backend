@@ -1,11 +1,18 @@
 import type { FastifyInstance } from 'fastify';
 import type { CreateProjectInput, UpdateProjectInput } from './schema.js';
 
+/**
+ * Service managing business logic and relational database queries for Projects.
+ * Handles related technologies, media associations, and timeline phases.
+ */
 export class ProjectService {
   constructor(private fastify: FastifyInstance) {}
 
+  /**
+   * Fetch all projects ordered by sortOrder, including related relations
+   */
   async getAll() {
-    return await (this.fastify as any).prisma.project.findMany({
+    return await this.fastify.prisma.project.findMany({
       include: {
         category: true,
         thumbnail: true,
@@ -17,8 +24,11 @@ export class ProjectService {
     });
   }
 
+  /**
+   * Fetch a single project by ID with all relations
+   */
   async getById(id: string) {
-    return await (this.fastify as any).prisma.project.findUnique({
+    return await this.fastify.prisma.project.findUnique({
       where: { id },
       include: {
         category: true,
@@ -32,10 +42,13 @@ export class ProjectService {
     });
   }
 
+  /**
+   * Create a new project with relations (technologies, media, phases)
+   */
   async create(data: CreateProjectInput) {
     const { technologyIds, projectMedia, phases, ...rest } = data;
     
-    return await (this.fastify as any).prisma.project.create({
+    return await this.fastify.prisma.project.create({
       data: {
         ...rest,
         technologies: technologyIds && technologyIds.length > 0 ? {
@@ -68,10 +81,13 @@ export class ProjectService {
     });
   }
 
+  /**
+   * Update an existing project and synchronize relations
+   */
   async update(id: string, data: UpdateProjectInput) {
     const { technologyIds, projectMedia, phases, ...rest } = data;
     
-    return await (this.fastify as any).prisma.project.update({
+    return await this.fastify.prisma.project.update({
       where: { id },
       data: {
         ...rest,
@@ -107,8 +123,11 @@ export class ProjectService {
     });
   }
 
+  /**
+   * Delete a project by ID
+   */
   async delete(id: string) {
-    return await (this.fastify as any).prisma.project.delete({
+    return await this.fastify.prisma.project.delete({
       where: { id }
     });
   }

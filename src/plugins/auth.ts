@@ -22,7 +22,11 @@ export default fp(async (server) => {
     try {
       await request.jwtVerify();
     } catch (err) {
-      reply.status(401).send({ error: 'Unauthorized', message: 'Authentication required' });
+      return reply.status(401).send({
+        success: false,
+        code: 'UNAUTHORIZED',
+        message: 'Authentication required. Please log in to continue.',
+      });
     }
   });
 });

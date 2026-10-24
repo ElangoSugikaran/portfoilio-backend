@@ -1,11 +1,14 @@
-import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { CertificatesService } from './service.js';
 import type { CreateCertificateInput, UpdateCertificateInput } from './schema.js';
 
+/**
+ * Controller handling HTTP requests and responses for Certificates.
+ */
 export class CertificatesController {
   private service: CertificatesService;
 
-  constructor(fastify: any) {
+  constructor(fastify: FastifyInstance) {
     this.service = new CertificatesService(fastify);
   }
 
@@ -33,7 +36,11 @@ export class CertificatesController {
   create = async (request: FastifyRequest<{ Body: CreateCertificateInput }>, reply: FastifyReply) => {
     try {
       const certificate = await this.service.create(request.body);
-      reply.status(201).send({ success: true, data: certificate });
+      reply.status(201).send({ 
+        success: true, 
+        message: 'Certificate created successfully', 
+        data: certificate 
+      });
     } catch (error: any) {
       reply.status(500).send({ success: false, code: 'INTERNAL_SERVER_ERROR', message: error.message });
     }
@@ -42,7 +49,11 @@ export class CertificatesController {
   update = async (request: FastifyRequest<{ Params: { id: string }, Body: UpdateCertificateInput }>, reply: FastifyReply) => {
     try {
       const certificate = await this.service.update(request.params.id, request.body);
-      reply.send({ success: true, data: certificate });
+      reply.send({ 
+        success: true, 
+        message: 'Certificate updated successfully', 
+        data: certificate 
+      });
     } catch (error: any) {
       if (error.code === 'P2025') {
         return reply.status(404).send({ success: false, code: 'NOT_FOUND', message: 'Certificate not found' });
@@ -59,7 +70,6 @@ export class CertificatesController {
       if (error.code === 'P2025') {
         return reply.status(404).send({ success: false, code: 'NOT_FOUND', message: 'Certificate not found' });
       }
-      // P2003 = Foreign key constraint failed. E.g. restricting deletion if it's referenced somewhere.
       reply.status(500).send({ success: false, code: 'INTERNAL_SERVER_ERROR', message: error.message });
     }
   };

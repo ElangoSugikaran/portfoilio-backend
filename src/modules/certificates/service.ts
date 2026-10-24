@@ -1,11 +1,14 @@
 import type { FastifyInstance } from 'fastify';
 import type { CreateCertificateInput, UpdateCertificateInput } from './schema.js';
 
+/**
+ * Service managing academic and digital certificates with media image relations.
+ */
 export class CertificatesService {
   constructor(private fastify: FastifyInstance) {}
 
   async getAll() {
-    return await (this.fastify as any).prisma.certificate.findMany({
+    return await this.fastify.prisma.certificate.findMany({
       include: {
         image: true // Include related media to easily display image on frontend
       },
@@ -17,7 +20,7 @@ export class CertificatesService {
   }
 
   async getById(id: string) {
-    return await (this.fastify as any).prisma.certificate.findUnique({
+    return await this.fastify.prisma.certificate.findUnique({
       where: { id },
       include: {
         image: true
@@ -26,14 +29,14 @@ export class CertificatesService {
   }
 
   async create(data: CreateCertificateInput) {
-    return await (this.fastify as any).prisma.certificate.create({
+    return await this.fastify.prisma.certificate.create({
       data,
       include: { image: true }
     });
   }
 
   async update(id: string, data: UpdateCertificateInput) {
-    return await (this.fastify as any).prisma.certificate.update({
+    return await this.fastify.prisma.certificate.update({
       where: { id },
       data,
       include: { image: true }
@@ -41,7 +44,7 @@ export class CertificatesService {
   }
 
   async delete(id: string) {
-    return await (this.fastify as any).prisma.certificate.delete({
+    return await this.fastify.prisma.certificate.delete({
       where: { id }
     });
   }

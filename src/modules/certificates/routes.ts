@@ -1,30 +1,56 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { CertificatesController } from './controller.js';
 import { createCertificateSchema, updateCertificateSchema, certificateParamSchema } from './schema.js';
-import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 
-export async function certificatesRoutes(server: FastifyInstance) {
-  const typedServer = server.withTypeProvider<ZodTypeProvider>();
-  const controller = new CertificatesController(server);
+/**
+ * Certificates Routes
+ * Manages academic and digital certification credentials.
+ */
+export const certificatesRoutes: FastifyPluginAsyncZod = async (app) => {
+  const controller = new CertificatesController(app);
 
-  typedServer.get('/', { preValidation: [server.authenticate] }, controller.getAll);
-  typedServer.get('/:id', { 
-    schema: { params: certificateParamSchema },
-    preValidation: [server.authenticate] 
+  app.get('/', {
+    schema: {
+      tags: ['Certificates'],
+      summary: 'Get all certificates',
+    },
+    preValidation: [app.authenticate],
+  }, controller.getAll);
+
+  app.get('/:id', {
+    schema: {
+      tags: ['Certificates'],
+      summary: 'Get a certificate by ID',
+      params: certificateParamSchema,
+    },
+    preValidation: [app.authenticate],
   }, controller.getById);
 
-  typedServer.post('/', { 
-    schema: { body: createCertificateSchema },
-    preValidation: [server.authenticate] 
+  app.post('/', {
+    schema: {
+      tags: ['Certificates'],
+      summary: 'Create a new certificate',
+      body: createCertificateSchema,
+    },
+    preValidation: [app.authenticate],
   }, controller.create);
   
-  typedServer.put('/:id', { 
-    schema: { params: certificateParamSchema, body: updateCertificateSchema },
-    preValidation: [server.authenticate] 
+  app.put('/:id', {
+    schema: {
+      tags: ['Certificates'],
+      summary: 'Update a certificate by ID',
+      params: certificateParamSchema,
+      body: updateCertificateSchema,
+    },
+    preValidation: [app.authenticate],
   }, controller.update);
   
-  typedServer.delete('/:id', { 
-    schema: { params: certificateParamSchema },
-    preValidation: [server.authenticate] 
+  app.delete('/:id', {
+    schema: {
+      tags: ['Certificates'],
+      summary: 'Delete a certificate by ID',
+      params: certificateParamSchema,
+    },
+    preValidation: [app.authenticate],
   }, controller.delete);
-}
+};

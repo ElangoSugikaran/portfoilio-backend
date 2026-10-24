@@ -1,11 +1,15 @@
-import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { ProjectService } from './service.js';
 import type { CreateProjectInput, UpdateProjectInput } from './schema.js';
 
+/**
+ * Controller handling HTTP requests and responses for the Projects module.
+ * Formats standardized JSON payloads for frontend client and admin dashboard.
+ */
 export class ProjectController {
   private service: ProjectService;
 
-  constructor(fastify: any) {
+  constructor(fastify: FastifyInstance) {
     this.service = new ProjectService(fastify);
   }
 
@@ -33,7 +37,11 @@ export class ProjectController {
   create = async (request: FastifyRequest<{ Body: CreateProjectInput }>, reply: FastifyReply) => {
     try {
       const project = await this.service.create(request.body);
-      reply.status(201).send({ success: true, data: project });
+      reply.status(201).send({ 
+        success: true, 
+        message: 'Project created successfully', 
+        data: project 
+      });
     } catch (error: any) {
       if (error.code === 'P2002') {
         return reply.status(400).send({ success: false, code: 'DUPLICATE_ENTRY', message: 'A project with this slug already exists' });
@@ -45,7 +53,11 @@ export class ProjectController {
   update = async (request: FastifyRequest<{ Params: { id: string }, Body: UpdateProjectInput }>, reply: FastifyReply) => {
     try {
       const project = await this.service.update(request.params.id, request.body);
-      reply.send({ success: true, data: project });
+      reply.send({ 
+        success: true, 
+        message: 'Project updated successfully', 
+        data: project 
+      });
     } catch (error: any) {
       if (error.code === 'P2025') {
         return reply.status(404).send({ success: false, code: 'NOT_FOUND', message: 'Project not found' });
