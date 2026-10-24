@@ -1,11 +1,14 @@
 import type { FastifyInstance } from 'fastify';
 import type { CreateExperienceInput, UpdateExperienceInput } from './schema.js';
 
+/**
+ * Service managing work experience records.
+ */
 export class ExperienceService {
   constructor(private fastify: FastifyInstance) {}
 
   async getAll() {
-    return await (this.fastify as any).prisma.experience.findMany({
+    return await this.fastify.prisma.experience.findMany({
       orderBy: [
         { sortOrder: 'asc' },
         { startDate: 'desc' }
@@ -14,26 +17,26 @@ export class ExperienceService {
   }
 
   async getById(id: string) {
-    return await (this.fastify as any).prisma.experience.findUnique({
+    return await this.fastify.prisma.experience.findUnique({
       where: { id }
     });
   }
 
   async create(data: CreateExperienceInput) {
-    return await (this.fastify as any).prisma.experience.create({
+    return await this.fastify.prisma.experience.create({
       data
     });
   }
 
   async update(id: string, data: UpdateExperienceInput) {
-    return await (this.fastify as any).prisma.experience.update({
+    return await this.fastify.prisma.experience.update({
       where: { id },
       data
     });
   }
 
   async delete(id: string) {
-    return await (this.fastify as any).prisma.experience.delete({
+    return await this.fastify.prisma.experience.delete({
       where: { id }
     });
   }

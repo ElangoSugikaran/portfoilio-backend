@@ -1,11 +1,15 @@
-import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { SkillsService } from './service.js';
 import type { CreateSkillInput, UpdateSkillInput } from './schema.js';
 
+/**
+ * Controller handling HTTP requests and responses for the Skills module.
+ * Formats responses for frontend consumption and toast notifications.
+ */
 export class SkillsController {
   private service: SkillsService;
 
-  constructor(fastify: any) {
+  constructor(fastify: FastifyInstance) {
     this.service = new SkillsService(fastify);
   }
 
@@ -33,7 +37,11 @@ export class SkillsController {
   create = async (request: FastifyRequest<{ Body: CreateSkillInput }>, reply: FastifyReply) => {
     try {
       const skill = await this.service.create(request.body);
-      reply.status(201).send({ success: true, data: skill });
+      reply.status(201).send({ 
+        success: true, 
+        message: 'Skill created successfully', 
+        data: skill 
+      });
     } catch (error: any) {
       if (error.code === 'P2002') {
         return reply.status(400).send({ success: false, code: 'DUPLICATE_ENTRY', message: 'A skill with this name already exists' });
@@ -45,7 +53,11 @@ export class SkillsController {
   update = async (request: FastifyRequest<{ Params: { id: string }, Body: UpdateSkillInput }>, reply: FastifyReply) => {
     try {
       const skill = await this.service.update(request.params.id, request.body);
-      reply.send({ success: true, data: skill });
+      reply.send({ 
+        success: true, 
+        message: 'Skill updated successfully', 
+        data: skill 
+      });
     } catch (error: any) {
       if (error.code === 'P2025') {
         return reply.status(404).send({ success: false, code: 'NOT_FOUND', message: 'Skill not found' });

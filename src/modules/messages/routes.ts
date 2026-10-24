@@ -6,20 +6,27 @@ import type { CreateMessageInput, UpdateMessageInput } from './schema.js';
 export const messageRoutes: FastifyPluginAsyncZod = async (app) => {
   const controller = new MessageController(app);
 
+  // Visitor contact form: Max 5 submissions per minute per IP to prevent spam
   app.post<{ Body: CreateMessageInput }>('/', {
+    config: {
+      rateLimit: {
+        max: 5,
+        timeWindow: '1 minute',
+      },
+    },
     schema: {
       body: createMessageSchema,
       tags: ['Messages'],
-      summary: 'Create a new contact message'
-    }
+      summary: 'Submit a new contact inquiry (Visitor)',
+    },
   }, controller.create);
 
   app.get('/', {
     onRequest: [app.authenticate],
     schema: {
       tags: ['Messages'],
-      summary: 'Get all messages (Admin)'
-    }
+      summary: 'Get all messages (Admin)',
+    },
   }, controller.getAll);
 
   app.patch<{ Params: { id: string }; Body: UpdateMessageInput }>('/:id', {
@@ -28,8 +35,8 @@ export const messageRoutes: FastifyPluginAsyncZod = async (app) => {
       params: messageParamSchema,
       body: updateMessageSchema,
       tags: ['Messages'],
-      summary: 'Update message status (Admin)'
-    }
+      summary: 'Update message status (Admin)',
+    },
   }, controller.update);
 
   app.delete<{ Params: { id: string } }>('/:id', {
@@ -37,7 +44,7 @@ export const messageRoutes: FastifyPluginAsyncZod = async (app) => {
     schema: {
       params: messageParamSchema,
       tags: ['Messages'],
-      summary: 'Delete message (Admin)'
-    }
+      summary: 'Delete message (Admin)',
+    },
   }, controller.delete);
 };

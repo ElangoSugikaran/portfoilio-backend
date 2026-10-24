@@ -22,7 +22,7 @@ export class DashboardService {
   constructor(private fastify: FastifyInstance) {}
 
   async getOverview(): Promise<DashboardOverviewResponse> {
-    const prisma = (this.fastify as any).prisma;
+    const prisma = this.fastify.prisma;
 
     // Start of current day (midnight UTC)
     const todayStart = new Date();
@@ -116,7 +116,7 @@ export class DashboardService {
 
     // Build unified Recent Activity list
     const rawActivities = [
-      ...recentProjects.map((p: any) => {
+      ...recentProjects.map((p) => {
         const isNew = Math.abs(new Date(p.updatedAt).getTime() - new Date(p.createdAt).getTime()) < 5000;
         return {
           id: `proj-${p.id}`,
@@ -127,7 +127,7 @@ export class DashboardService {
           timeAgo: formatRelativeTime(new Date(p.updatedAt)),
         };
       }),
-      ...recentMessages.map((m: any) => ({
+      ...recentMessages.map((m) => ({
         id: `msg-${m.id}`,
         type: 'MESSAGE' as const,
         title: `New message from "${m.name}"`,
@@ -135,7 +135,7 @@ export class DashboardService {
         timestamp: new Date(m.createdAt),
         timeAgo: formatRelativeTime(new Date(m.createdAt)),
       })),
-      ...recentCerts.map((c: any) => ({
+      ...recentCerts.map((c) => ({
         id: `cert-${c.id}`,
         type: 'CERTIFICATE' as const,
         title: `Added certificate "${c.title}"`,

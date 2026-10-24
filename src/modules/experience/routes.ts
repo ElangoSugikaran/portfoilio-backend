@@ -1,30 +1,56 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { ExperienceController } from './controller.js';
 import { createExperienceSchema, updateExperienceSchema, experienceParamSchema } from './schema.js';
-import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 
-export async function experienceRoutes(server: FastifyInstance) {
-  const typedServer = server.withTypeProvider<ZodTypeProvider>();
-  const controller = new ExperienceController(server);
+/**
+ * Experience Routes
+ * Manages career milestones and work experience history.
+ */
+export const experienceRoutes: FastifyPluginAsyncZod = async (app) => {
+  const controller = new ExperienceController(app);
 
-  typedServer.get('/', { preValidation: [server.authenticate] }, controller.getAll);
-  typedServer.get('/:id', { 
-    schema: { params: experienceParamSchema },
-    preValidation: [server.authenticate] 
+  app.get('/', {
+    schema: {
+      tags: ['Experience'],
+      summary: 'Get all work experience entries',
+    },
+    preValidation: [app.authenticate],
+  }, controller.getAll);
+
+  app.get('/:id', {
+    schema: {
+      tags: ['Experience'],
+      summary: 'Get an experience entry by ID',
+      params: experienceParamSchema,
+    },
+    preValidation: [app.authenticate],
   }, controller.getById);
 
-  typedServer.post('/', { 
-    schema: { body: createExperienceSchema },
-    preValidation: [server.authenticate] 
+  app.post('/', {
+    schema: {
+      tags: ['Experience'],
+      summary: 'Create a new work experience entry',
+      body: createExperienceSchema,
+    },
+    preValidation: [app.authenticate],
   }, controller.create);
   
-  typedServer.put('/:id', { 
-    schema: { params: experienceParamSchema, body: updateExperienceSchema },
-    preValidation: [server.authenticate] 
+  app.put('/:id', {
+    schema: {
+      tags: ['Experience'],
+      summary: 'Update an experience entry by ID',
+      params: experienceParamSchema,
+      body: updateExperienceSchema,
+    },
+    preValidation: [app.authenticate],
   }, controller.update);
   
-  typedServer.delete('/:id', { 
-    schema: { params: experienceParamSchema },
-    preValidation: [server.authenticate] 
+  app.delete('/:id', {
+    schema: {
+      tags: ['Experience'],
+      summary: 'Delete an experience entry by ID',
+      params: experienceParamSchema,
+    },
+    preValidation: [app.authenticate],
   }, controller.delete);
-}
+};

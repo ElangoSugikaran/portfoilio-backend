@@ -1,12 +1,16 @@
-import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { AuthService } from './service.js';
 import type { LoginInput, UpdatePasswordInput, UpdateProfileInput } from './schema.js';
 
+/**
+ * Controller handling authentication operations (login, logout, profile, password).
+ * Sets secure HTTP-Only cookies and returns standardized payloads for UI toast notifications.
+ */
 export class AuthController {
   private service: AuthService;
-  private fastify: any;
+  private fastify: FastifyInstance;
 
-  constructor(fastify: any) {
+  constructor(fastify: FastifyInstance) {
     this.service = new AuthService(fastify);
     this.fastify = fastify;
   }
@@ -24,15 +28,25 @@ export class AuthController {
           sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
           maxAge: 7 * 24 * 60 * 60 // 7 days
         })
-        .send({ success: true, admin, token });
+        .send({ 
+          success: true, 
+          message: 'Logged in successfully', 
+          admin, 
+          token 
+        });
     } catch (error: any) {
       if (error.message === 'Invalid credentials') {
-        return reply.status(401).send({ success: false, message: 'Invalid credentials' });
+        return reply.status(401).send({ 
+          success: false, 
+          code: 'UNAUTHORIZED',
+          message: 'Invalid email or password' 
+        });
       }
       request.log.error(error, 'Error during login');
       reply.status(500).send({ 
         success: false, 
-        message: 'Database or server error during login. Please try again.' 
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Server error during login. Please try again.' 
       });
     }
   };
@@ -45,20 +59,20 @@ export class AuthController {
   
   getProfile = async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const adminId = (request.user as any).id;
+      const adminId = request.user.id;
       const admin = await this.service.getProfile(adminId);
       if (!admin) {
-        return reply.status(404).send({ success: false, message: 'Admin not found' });
+        return reply.status(404).send({ success: false, code: 'NOT_FOUND', message: 'Admin not found' });
       }
-      reply.send({ success: true, admin });
+      reply.send({ success: true, data: admin });
     } catch (error: any) {
-      reply.status(500).send({ success: false, message: error.message });
+      reply.status(500).send({ success: false, code: 'INTERNAL_SERVER_ERROR', message: error.message });
     }
   };
 
   updatePassword = async (request: FastifyRequest<{ Body: UpdatePasswordInput }>, reply: FastifyReply) => {
     try {
-      const adminId = (request.user as any).id;
+      const adminId = request.user.id;
       await this.service.updatePassword(adminId, request.body);
       reply.send({ success: true, message: 'Password updated successfully' });
     } catch (error: any) {
@@ -68,7 +82,7 @@ export class AuthController {
 
   updateProfile = async (request: FastifyRequest<{ Body: UpdateProfileInput }>, reply: FastifyReply) => {
     try {
-      const adminId = (request.user as any).id;
+      const adminId = request.user.id;
       const updatedAdmin = await this.service.updateProfile(adminId, request.body);
       
       // Re-sign token if email changed (since email is in the JWT payload)
@@ -85,7 +99,12 @@ export class AuthController {
           sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
           maxAge: 7 * 24 * 60 * 60 
         })
-        .send({ success: true, admin: updatedAdmin, token: newToken });
+        .send({ 
+          success: true, 
+          message: 'Profile updated successfully', 
+          admin: updatedAdmin, 
+          token: newToken 
+        });
     } catch (error: any) {
       if (error.code === 'P2002') {
         return reply.status(400).send({ success: false, code: 'DUPLICATE_ENTRY', message: 'Email is already in use' });

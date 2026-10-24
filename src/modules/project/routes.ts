@@ -1,30 +1,56 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { ProjectController } from './controller.js';
 import { createProjectSchema, updateProjectSchema, projectParamSchema } from './schema.js';
-import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 
-export async function projectRoutes(server: FastifyInstance) {
-  const typedServer = server.withTypeProvider<ZodTypeProvider>();
-  const controller = new ProjectController(server);
+/**
+ * Project Routes
+ * Manages portfolio showcase projects, tags, media associations, and timeline phases.
+ */
+export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
+  const controller = new ProjectController(app);
 
-  typedServer.get('/', { preValidation: [server.authenticate] }, controller.getAll);
-  typedServer.get('/:id', { 
-    schema: { params: projectParamSchema },
-    preValidation: [server.authenticate] 
+  app.get('/', {
+    schema: {
+      tags: ['Projects'],
+      summary: 'Get all projects',
+    },
+    preValidation: [app.authenticate],
+  }, controller.getAll);
+
+  app.get('/:id', {
+    schema: {
+      tags: ['Projects'],
+      summary: 'Get a single project by ID',
+      params: projectParamSchema,
+    },
+    preValidation: [app.authenticate],
   }, controller.getById);
 
-  typedServer.post('/', { 
-    schema: { body: createProjectSchema },
-    preValidation: [server.authenticate] 
+  app.post('/', {
+    schema: {
+      tags: ['Projects'],
+      summary: 'Create a new project',
+      body: createProjectSchema,
+    },
+    preValidation: [app.authenticate],
   }, controller.create);
   
-  typedServer.put('/:id', { 
-    schema: { params: projectParamSchema, body: updateProjectSchema },
-    preValidation: [server.authenticate] 
+  app.put('/:id', {
+    schema: {
+      tags: ['Projects'],
+      summary: 'Update an existing project by ID',
+      params: projectParamSchema,
+      body: updateProjectSchema,
+    },
+    preValidation: [app.authenticate],
   }, controller.update);
   
-  typedServer.delete('/:id', { 
-    schema: { params: projectParamSchema },
-    preValidation: [server.authenticate] 
+  app.delete('/:id', {
+    schema: {
+      tags: ['Projects'],
+      summary: 'Delete a project by ID',
+      params: projectParamSchema,
+    },
+    preValidation: [app.authenticate],
   }, controller.delete);
-}
+};

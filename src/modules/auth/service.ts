@@ -2,11 +2,14 @@ import type { FastifyInstance } from 'fastify';
 import bcrypt from 'bcrypt';
 import type { LoginInput, UpdatePasswordInput, UpdateProfileInput } from './schema.js';
 
+/**
+ * Service managing admin authentication, password hashing, and credentials.
+ */
 export class AuthService {
   constructor(private fastify: FastifyInstance) {}
 
   async login(input: LoginInput) {
-    const admin = await (this.fastify as any).prisma.admin.findUnique({
+    const admin = await this.fastify.prisma.admin.findUnique({
       where: { email: input.email },
       include: { profileImage: true }
     });
@@ -39,7 +42,7 @@ export class AuthService {
   }
 
   async getProfile(adminId: string) {
-    const admin = await (this.fastify as any).prisma.admin.findUnique({
+    const admin = await this.fastify.prisma.admin.findUnique({
       where: { id: adminId },
       select: {
         id: true,
@@ -56,7 +59,7 @@ export class AuthService {
   }
 
   async updatePassword(adminId: string, input: UpdatePasswordInput) {
-    const admin = await (this.fastify as any).prisma.admin.findUnique({
+    const admin = await this.fastify.prisma.admin.findUnique({
       where: { id: adminId }
     });
 
@@ -71,7 +74,7 @@ export class AuthService {
 
     const newPasswordHash = await bcrypt.hash(input.newPassword, 10);
 
-    await (this.fastify as any).prisma.admin.update({
+    await this.fastify.prisma.admin.update({
       where: { id: adminId },
       data: { passwordHash: newPasswordHash }
     });
@@ -80,16 +83,16 @@ export class AuthService {
   }
 
   async updateProfile(adminId: string, input: UpdateProfileInput) {
-    const data: any = {};
-    if (input.email !== undefined) data.email = input.email;
-    if (input.name !== undefined) data.name = input.name;
+    const updateData: { email?: string; name?: string | null; profileImageId?: string | null } = {};
+    if (input.email !== undefined) updateData.email = input.email;
+    if (input.name !== undefined) updateData.name = input.name;
     if (input.profileImageId !== undefined) {
-      data.profileImageId = input.profileImageId;
+      updateData.profileImageId = input.profileImageId;
     }
 
-    const admin = await (this.fastify as any).prisma.admin.update({
+    const admin = await this.fastify.prisma.admin.update({
       where: { id: adminId },
-      data,
+      data: updateData,
       select: {
         id: true,
         email: true,

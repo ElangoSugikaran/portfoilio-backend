@@ -1,10 +1,13 @@
-import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { DashboardService } from './service.js';
 
+/**
+ * Controller handling Admin Dashboard overview and metrics aggregation.
+ */
 export class DashboardController {
   private service: DashboardService;
 
-  constructor(fastify: any) {
+  constructor(fastify: FastifyInstance) {
     this.service = new DashboardService(fastify);
   }
 
