@@ -9,12 +9,12 @@ import { createSkillSchema, updateSkillSchema, skillParamSchema } from './schema
 export const skillsRoutes: FastifyPluginAsyncZod = async (app) => {
   const controller = new SkillsController(app);
 
+  // 🔓 Public:
   app.get('/', {
     schema: {
       tags: ['Skills'],
       summary: 'Get all skills / technologies',
     },
-    preValidation: [app.authenticate],
   }, controller.getAll);
 
   app.get('/:id', {
@@ -23,9 +23,9 @@ export const skillsRoutes: FastifyPluginAsyncZod = async (app) => {
       summary: 'Get a single skill by ID',
       params: skillParamSchema,
     },
-    preValidation: [app.authenticate],
   }, controller.getById);
 
+  // 🔒 Protected:
   app.post('/', {
     schema: {
       tags: ['Skills'],

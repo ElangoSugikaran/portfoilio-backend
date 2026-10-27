@@ -7,8 +7,12 @@ import type { CreateCertificateInput, UpdateCertificateInput } from './schema.js
 export class CertificatesService {
   constructor(private fastify: FastifyInstance) {}
 
-  async getAll() {
+  async getAll(filter?: { isVisible?: boolean; category?: any }) {
     return await this.fastify.prisma.certificate.findMany({
+      where: {
+        ...(filter?.isVisible !== undefined ? { isVisible: filter.isVisible } : { isVisible: true }),
+        ...(filter?.category ? { category: filter.category } : {})
+      },
       include: {
         image: true // Include related media to easily display image on frontend
       },

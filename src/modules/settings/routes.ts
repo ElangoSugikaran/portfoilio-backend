@@ -9,14 +9,15 @@ import { updateSettingsSchema } from './schema.js';
 export const settingsRoutes: FastifyPluginAsyncZod = async (app) => {
   const controller = new SettingsController(app);
 
+  // 🔓 Public:
   app.get('/', {
     schema: {
       tags: ['Settings'],
       summary: 'Get site configuration and owner profile settings',
     },
-    preValidation: [app.authenticate],
   }, controller.getSettings);
   
+  // 🔒 Protected:
   app.put('/', {
     schema: {
       tags: ['Settings'],

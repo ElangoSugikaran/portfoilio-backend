@@ -21,7 +21,7 @@ export class SettingsService {
     if (!settings) {
       // Create defaults if it doesn't exist
       settings = await this.fastify.prisma.siteSettings.create({
-        data: { id: 1, ownerName: "Portfolio Owner", roles: ["Developer"] },
+        data: { id: 1, ownerName: "Elango Sugikaran", roles: ["Full Stack Developer"] },
         include: {
           profileImage: true,
           hoverImage: true,
@@ -30,8 +30,16 @@ export class SettingsService {
         }
       });
     }
+
+    const socialLinks = await this.fastify.prisma.socialLink.findMany({
+      where: { isVisible: true },
+      orderBy: { sortOrder: 'asc' }
+    });
     
-    return settings;
+    return {
+      ...settings,
+      socialLinks
+    };
   }
 
   async updateSettings(data: UpdateSettingsInput) {
@@ -40,8 +48,8 @@ export class SettingsService {
       update: data,
       create: {
         id: 1,
-        ownerName: data.ownerName || "Portfolio Owner",
-        roles: data.roles || ["Developer"],
+        ownerName: data.ownerName || "Elango Sugikaran",
+        roles: data.roles || ["Full Stack Developer"],
         ...data
       },
       include: {

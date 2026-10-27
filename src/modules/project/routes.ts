@@ -9,12 +9,12 @@ import { createProjectSchema, updateProjectSchema, projectParamSchema } from './
 export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
   const controller = new ProjectController(app);
 
+  // 🔓 Public:
   app.get('/', {
     schema: {
       tags: ['Projects'],
       summary: 'Get all projects',
     },
-    preValidation: [app.authenticate],
   }, controller.getAll);
 
   app.get('/:id', {
@@ -23,9 +23,9 @@ export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
       summary: 'Get a single project by ID',
       params: projectParamSchema,
     },
-    preValidation: [app.authenticate],
   }, controller.getById);
 
+  // 🔒 Protected:
   app.post('/', {
     schema: {
       tags: ['Projects'],

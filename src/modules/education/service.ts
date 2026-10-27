@@ -7,8 +7,12 @@ import type { CreateEducationInput, UpdateEducationInput } from './schema.js';
 export class EducationService {
   constructor(private fastify: FastifyInstance) {}
 
-  async getAll() {
+  async getAll(filter?: { isVisible?: boolean; showOnHome?: boolean }) {
     return await this.fastify.prisma.education.findMany({
+      where: {
+        ...(filter?.isVisible !== undefined ? { isVisible: filter.isVisible } : {}),
+        ...(filter?.showOnHome !== undefined ? { showOnHome: filter.showOnHome } : {})
+      },
       orderBy: [
         { sortOrder: 'asc' },
         { startDate: 'desc' }
@@ -33,6 +37,17 @@ export class EducationService {
       where: { id },
       data
     });
+  }
+
+  async reorder(orders: { id: string; sortOrder: number }[]) {
+    return await this.fastify.prisma.$transaction(
+      orders.map(item =>
+        this.fastify.prisma.education.update({
+          where: { id: item.id },
+          data: { sortOrder: item.sortOrder }
+        })
+      )
+    );
   }
 
   async delete(id: string) {

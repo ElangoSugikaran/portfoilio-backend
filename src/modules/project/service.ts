@@ -9,10 +9,15 @@ export class ProjectService {
   constructor(private fastify: FastifyInstance) {}
 
   /**
-   * Fetch all projects ordered by sortOrder, including related relations
+   * Fetch all projects ordered by sortOrder, including related relations.
+   * By default, returns only PUBLISHED projects for public visitors.
    */
-  async getAll() {
+  async getAll(filter?: { status?: 'PUBLISHED' | 'DRAFT'; featured?: boolean }) {
     return await this.fastify.prisma.project.findMany({
+      where: {
+        ...(filter?.status ? { status: filter.status } : { status: 'PUBLISHED' }),
+        ...(filter?.featured !== undefined ? { featured: filter.featured } : {})
+      },
       include: {
         category: true,
         thumbnail: true,
@@ -25,11 +30,14 @@ export class ProjectService {
   }
 
   /**
-   * Fetch a single project by ID with all relations
+   * Fetch a single project by ID or slug with all relations
    */
-  async getById(id: string) {
-    return await this.fastify.prisma.project.findUnique({
-      where: { id },
+  async getById(id: string, filter?: { status?: 'PUBLISHED' | 'DRAFT' }) {
+    return await this.fastify.prisma.project.findFirst({
+      where: {
+        OR: [{ id }, { slug: id }],
+        ...(filter?.status ? { status: filter.status } : {})
+      },
       include: {
         category: true,
         thumbnail: true,

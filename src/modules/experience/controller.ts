@@ -12,9 +12,17 @@ export class ExperienceController {
     this.service = new ExperienceService(fastify);
   }
 
-  getAll = async (request: FastifyRequest, reply: FastifyReply) => {
+  getAll = async (
+    request: FastifyRequest<{ Querystring: { all?: string; isVisible?: string } }>, 
+    reply: FastifyReply
+  ) => {
     try {
-      const experience = await this.service.getAll();
+      const isVisible = request.query?.all === 'true' 
+        ? undefined 
+        : request.query?.isVisible !== undefined 
+          ? request.query.isVisible === 'true' 
+          : true;
+      const experience = await this.service.getAll(isVisible !== undefined ? { isVisible } : undefined);
       reply.send({ success: true, data: experience });
     } catch (error: any) {
       reply.status(500).send({ success: false, code: 'INTERNAL_SERVER_ERROR', message: error.message });

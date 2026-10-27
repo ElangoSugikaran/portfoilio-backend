@@ -113,6 +113,7 @@ model Media {
   settingsHover     SiteSettings[] @relation("SettingsHoverImage")
   settingsAbout     SiteSettings[] @relation("SettingsAboutImage")
   settingsCv        SiteSettings[] @relation("SettingsCv")
+  settingsIntro     SiteSettings[] @relation("SettingsIntroMedia")
   adminProfile      Admin[]        @relation("AdminProfileImage")
 
   @@unique([provider, publicId]) // no duplicate Cloudinary assets (NULLs are allowed repeatedly)
@@ -300,6 +301,9 @@ model SiteSettings {
   hoverImage     Media?  @relation("SettingsHoverImage", fields: [hoverImageId], references: [id], onDelete: SetNull)
   aboutImageId   String?
   aboutImage     Media?  @relation("SettingsAboutImage", fields: [aboutImageId], references: [id], onDelete: SetNull)
+  introMediaId   String?
+  introMedia     Media?  @relation("SettingsIntroMedia", fields: [introMediaId], references: [id], onDelete: SetNull)
+  availableForWork Boolean @default(true)
   cvId           String?
   cv             Media?  @relation("SettingsCv", fields: [cvId], references: [id], onDelete: SetNull)
 
@@ -310,6 +314,21 @@ model SocialLink {
   id        String  @id @default(cuid())
   platform  String // "github", "linkedin", "instagram" (string so new ones need no migration)
   url       String
+  icon      String  @default("Globe")
   isVisible Boolean @default(true)
   sortOrder Int     @default(0)
+}
+
+
+model ResumeDocument {
+  id         String   @id @default(cuid())
+  title      String
+  fileId     String
+  fileUrl    String
+  fileName   String?
+  fileSize   String?
+  isPrimary  Boolean  @default(false)
+  uploadedAt String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
