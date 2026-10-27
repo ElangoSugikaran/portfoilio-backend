@@ -9,10 +9,14 @@ export class SkillsService {
   constructor(private fastify: FastifyInstance) {}
 
   /**
-   * Retrieve all skills ordered by display sort order
+   * Retrieve all skills ordered by display sort order.
+   * By default, returns only items where showInSkills is true for the public showcase.
    */
-  async getAll() {
+  async getAll(filter?: { showInSkills?: boolean }) {
     return await this.fastify.prisma.technology.findMany({
+      where: {
+        ...(filter?.showInSkills !== undefined ? { showInSkills: filter.showInSkills } : { showInSkills: true })
+      },
       orderBy: { sortOrder: 'asc' }
     });
   }

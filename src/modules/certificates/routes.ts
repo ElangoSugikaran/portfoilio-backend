@@ -9,12 +9,12 @@ import { createCertificateSchema, updateCertificateSchema, certificateParamSchem
 export const certificatesRoutes: FastifyPluginAsyncZod = async (app) => {
   const controller = new CertificatesController(app);
 
+  // 🔓 Public:
   app.get('/', {
     schema: {
       tags: ['Certificates'],
       summary: 'Get all certificates',
     },
-    preValidation: [app.authenticate],
   }, controller.getAll);
 
   app.get('/:id', {
@@ -23,9 +23,9 @@ export const certificatesRoutes: FastifyPluginAsyncZod = async (app) => {
       summary: 'Get a certificate by ID',
       params: certificateParamSchema,
     },
-    preValidation: [app.authenticate],
   }, controller.getById);
 
+  // 🔒 Protected:
   app.post('/', {
     schema: {
       tags: ['Certificates'],

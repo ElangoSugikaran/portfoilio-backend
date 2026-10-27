@@ -13,18 +13,30 @@ export class ProjectController {
     this.service = new ProjectService(fastify);
   }
 
-  getAll = async (request: FastifyRequest, reply: FastifyReply) => {
+  getAll = async (
+    request: FastifyRequest<{ Querystring: { status?: 'PUBLISHED' | 'DRAFT'; featured?: string | boolean } }>, 
+    reply: FastifyReply
+  ) => {
     try {
-      const projects = await this.service.getAll();
+      const featured = request.query?.featured !== undefined 
+        ? (request.query.featured === 'true' || (request.query.featured as any) === true)
+        : undefined;
+      const status = request.query?.status ?? 'PUBLISHED';
+
+      const projects = await this.service.getAll({ status, featured });
       reply.send({ success: true, data: projects });
     } catch (error: any) {
       reply.status(500).send({ success: false, code: 'INTERNAL_SERVER_ERROR', message: error.message });
     }
   };
 
-  getById = async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+  getById = async (
+    request: FastifyRequest<{ Params: { id: string }, Querystring: { status?: 'PUBLISHED' | 'DRAFT' } }>, 
+    reply: FastifyReply
+  ) => {
     try {
-      const project = await this.service.getById(request.params.id);
+      const status = request.query?.status ?? 'PUBLISHED';
+      const project = await this.service.getById(request.params.id, { status });
       if (!project) {
         return reply.status(404).send({ success: false, code: 'NOT_FOUND', message: 'Project not found' });
       }

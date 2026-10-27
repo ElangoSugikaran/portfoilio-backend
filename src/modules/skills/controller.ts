@@ -13,9 +13,17 @@ export class SkillsController {
     this.service = new SkillsService(fastify);
   }
 
-  getAll = async (request: FastifyRequest, reply: FastifyReply) => {
+  getAll = async (
+    request: FastifyRequest<{ Querystring: { all?: string; showInSkills?: string } }>, 
+    reply: FastifyReply
+  ) => {
     try {
-      const skills = await this.service.getAll();
+      const showInSkills = request.query?.all === 'true' 
+        ? undefined 
+        : request.query?.showInSkills !== undefined 
+          ? request.query.showInSkills === 'true' 
+          : true;
+      const skills = await this.service.getAll(showInSkills !== undefined ? { showInSkills } : undefined);
       reply.send({ success: true, data: skills });
     } catch (error: any) {
       reply.status(500).send({ success: false, code: 'INTERNAL_SERVER_ERROR', message: error.message });

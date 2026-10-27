@@ -12,9 +12,22 @@ export class CertificatesController {
     this.service = new CertificatesService(fastify);
   }
 
-  getAll = async (request: FastifyRequest, reply: FastifyReply) => {
+  getAll = async (
+    request: FastifyRequest<{ Querystring: { all?: string; isVisible?: string; category?: any } }>, 
+    reply: FastifyReply
+  ) => {
     try {
-      const certificates = await this.service.getAll();
+      const isVisible = request.query?.all === 'true' 
+        ? undefined 
+        : request.query?.isVisible !== undefined 
+          ? request.query.isVisible === 'true' 
+          : true;
+      const category = request.query?.category;
+
+      const certificates = await this.service.getAll({
+        ...(isVisible !== undefined ? { isVisible } : {}),
+        ...(category ? { category } : {})
+      });
       reply.send({ success: true, data: certificates });
     } catch (error: any) {
       reply.status(500).send({ success: false, code: 'INTERNAL_SERVER_ERROR', message: error.message });

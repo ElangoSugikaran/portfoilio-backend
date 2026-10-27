@@ -1,6 +1,6 @@
 import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { EducationService } from './service.js';
-import type { CreateEducationInput, UpdateEducationInput } from './schema.js';
+import type { CreateEducationInput, UpdateEducationInput, ReorderEducationInput } from './schema.js';
 
 /**
  * Controller handling HTTP requests and responses for Education history.
@@ -12,9 +12,24 @@ export class EducationController {
     this.service = new EducationService(fastify);
   }
 
-  getAll = async (request: FastifyRequest, reply: FastifyReply) => {
+  getAll = async (
+    request: FastifyRequest<{ Querystring: { all?: string; isVisible?: string; showOnHome?: string } }>, 
+    reply: FastifyReply
+  ) => {
     try {
-      const education = await this.service.getAll();
+      const isVisible = request.query?.all === 'true' 
+        ? undefined 
+        : request.query?.isVisible !== undefined 
+          ? request.query.isVisible === 'true' 
+          : true;
+      const showOnHome = request.query?.showOnHome !== undefined 
+        ? request.query.showOnHome === 'true' 
+        : undefined;
+
+      const education = await this.service.getAll({
+        ...(isVisible !== undefined ? { isVisible } : {}),
+        ...(showOnHome !== undefined ? { showOnHome } : {})
+      });
       reply.send({ success: true, data: education });
     } catch (error: any) {
       reply.status(500).send({ success: false, code: 'INTERNAL_SERVER_ERROR', message: error.message });
@@ -58,6 +73,15 @@ export class EducationController {
       if (error.code === 'P2025') {
         return reply.status(404).send({ success: false, code: 'NOT_FOUND', message: 'Education not found' });
       }
+      reply.status(500).send({ success: false, code: 'INTERNAL_SERVER_ERROR', message: error.message });
+    }
+  };
+
+  reorder = async (request: FastifyRequest<{ Body: ReorderEducationInput }>, reply: FastifyReply) => {
+    try {
+      await this.service.reorder(request.body.orders);
+      reply.send({ success: true, message: 'Education entries reordered successfully' });
+    } catch (error: any) {
       reply.status(500).send({ success: false, code: 'INTERNAL_SERVER_ERROR', message: error.message });
     }
   };

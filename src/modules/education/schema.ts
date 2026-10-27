@@ -19,3 +19,12 @@ export const educationParamSchema = z.object({ id: z.string() });
 
 export type CreateEducationInput = z.infer<typeof createEducationSchema>;
 export type UpdateEducationInput = z.infer<typeof updateEducationSchema>;
+
+export const reorderEducationSchema = z.object({
+  orders: z.array(z.object({
+    id: z.string(),
+    sortOrder: z.number().int()
+  }))
+});
+
+export type ReorderEducationInput = z.infer<typeof reorderEducationSchema>;

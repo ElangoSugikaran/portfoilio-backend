@@ -9,12 +9,12 @@ import { createExperienceSchema, updateExperienceSchema, experienceParamSchema }
 export const experienceRoutes: FastifyPluginAsyncZod = async (app) => {
   const controller = new ExperienceController(app);
 
+  // 🔓 Public:
   app.get('/', {
     schema: {
       tags: ['Experience'],
       summary: 'Get all work experience entries',
     },
-    preValidation: [app.authenticate],
   }, controller.getAll);
 
   app.get('/:id', {
@@ -23,9 +23,9 @@ export const experienceRoutes: FastifyPluginAsyncZod = async (app) => {
       summary: 'Get an experience entry by ID',
       params: experienceParamSchema,
     },
-    preValidation: [app.authenticate],
   }, controller.getById);
 
+  // 🔒 Protected:
   app.post('/', {
     schema: {
       tags: ['Experience'],

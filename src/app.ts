@@ -15,6 +15,7 @@ import { experienceRoutes } from "./modules/experience/routes.js";
 import { certificatesRoutes } from "./modules/certificates/routes.js";
 import { projectRoutes } from "./modules/project/routes.js";
 import { settingsRoutes } from "./modules/settings/routes.js";
+import { aboutRoutes } from "./modules/about/routes.js";
 import { mediaRoutes } from "./modules/media/routes.js";
 import { educationRoutes } from "./modules/education/routes.js";
 import { messageRoutes } from "./modules/messages/routes.js";
@@ -65,6 +66,7 @@ export async function buildApp() {
   await app.register(certificatesRoutes, { prefix: '/api/v1/certificates' });
   await app.register(projectRoutes, { prefix: '/api/v1/projects' });
   await app.register(settingsRoutes, { prefix: '/api/v1/settings' });
+  await app.register(aboutRoutes, { prefix: '/api/v1/about' });
   await app.register(mediaRoutes, { prefix: '/api/v1/media' });
   await app.register(educationRoutes, { prefix: '/api/v1/education' });
   await app.register(messageRoutes, { prefix: '/api/v1/messages' });

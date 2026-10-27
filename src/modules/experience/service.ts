@@ -7,8 +7,11 @@ import type { CreateExperienceInput, UpdateExperienceInput } from './schema.js';
 export class ExperienceService {
   constructor(private fastify: FastifyInstance) {}
 
-  async getAll() {
+  async getAll(filter?: { isVisible?: boolean }) {
     return await this.fastify.prisma.experience.findMany({
+      where: {
+        ...(filter?.isVisible !== undefined ? { isVisible: filter.isVisible } : { isVisible: true })
+      },
       orderBy: [
         { sortOrder: 'asc' },
         { startDate: 'desc' }
