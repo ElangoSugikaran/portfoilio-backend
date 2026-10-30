@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { MultipartFile } from '@fastify/multipart';
 import type { UploadApiResponse } from 'cloudinary';
+import { randomUUID } from 'node:crypto';
 import { PrismaClient, MediaType } from '../../generated/prisma/client.js';
 import { cloudinary } from '../../lib/cloudinary.js';
 import sharp from 'sharp';
@@ -40,10 +41,25 @@ export class MediaService {
       mediaType = 'DOCUMENT';
     }
 
-    // Upload to Cloudinary via stream
+    const originalFileName = file.filename.split(/[\\/]/).pop() || 'file';
+    const fileExtension = originalFileName.match(/\.[a-zA-Z0-9]{1,10}$/)?.[0].toLowerCase() || '';
+    const safeFileBaseName = originalFileName
+      .slice(0, originalFileName.length - fileExtension.length)
+      .replace(/[^a-zA-Z0-9_-]+/g, '-') || 'file';
+    const uploadOptions = {
+      resource_type: resourceType,
+      folder: 'portfolio',
+      ...(mediaType === 'DOCUMENT'
+        ? {
+            public_id: `${safeFileBaseName}-${randomUUID()}${fileExtension}`,
+          }
+        : {}),
+    };
+
+    // Raw Cloudinary assets need the extension in the public ID for reliable downloads.
     const uploadResult = await new Promise<UploadApiResponse>((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
-        { resource_type: resourceType, folder: 'portfolio' },
+        uploadOptions,
         (error, result) => {
           if (error || !result) return reject(error || new Error('Upload failed'));
           resolve(result);
@@ -63,6 +79,7 @@ export class MediaService {
         sizeBytes: uploadResult.bytes,
         width: uploadResult.width,
         height: uploadResult.height,
+        alt: mediaType === 'DOCUMENT' ? originalFileName : undefined,
       }
     });
 
