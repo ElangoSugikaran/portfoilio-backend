@@ -4,7 +4,7 @@ import { updateSettingsSchema } from './schema.js';
 
 /**
  * Settings Routes
- * Manages singleton site metadata, about text, hero intro, and asset links.
+ * Manages site-wide display and SEO configuration. Personal profile data is managed by /about.
  */
 export const settingsRoutes: FastifyPluginAsyncZod = async (app) => {
   const controller = new SettingsController(app);
@@ -13,7 +13,7 @@ export const settingsRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get('/', {
     schema: {
       tags: ['Settings'],
-      summary: 'Get site configuration and owner profile settings',
+      summary: 'Get site-wide display and SEO settings',
     },
   }, controller.getSettings);
   
@@ -21,7 +21,7 @@ export const settingsRoutes: FastifyPluginAsyncZod = async (app) => {
   app.put('/', {
     schema: {
       tags: ['Settings'],
-      summary: 'Update site settings and metadata',
+      summary: 'Update site-wide display and SEO settings',
       body: updateSettingsSchema,
     },
     preValidation: [app.authenticate],

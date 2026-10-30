@@ -1,5 +1,13 @@
 import type { FastifyInstance } from 'fastify';
-import type { CreateProjectInput, UpdateProjectInput } from './schema.js';
+import type { CreateProjectInput, ProjectListQuery, UpdateProjectInput } from './schema.js';
+
+const companyProjectWhere = {
+  OR: [
+    { slug: { in: ['rentzee', 'digital-tourism'] } },
+    { title: { contains: 'rentzee', mode: 'insensitive' as const } },
+    { title: { contains: 'digital tourism', mode: 'insensitive' as const } },
+  ],
+};
 
 /**
  * Service managing business logic and relational database queries for Projects.
@@ -8,16 +16,31 @@ import type { CreateProjectInput, UpdateProjectInput } from './schema.js';
 export class ProjectService {
   constructor(private fastify: FastifyInstance) {}
 
-  /**
-   * Fetch all projects ordered by sortOrder, including related relations.
-   * By default, returns only PUBLISHED projects for public visitors.
-   */
-  async getAll(filter?: { status?: 'PUBLISHED' | 'DRAFT'; featured?: boolean }) {
-    return await this.fastify.prisma.project.findMany({
-      where: {
-        ...(filter?.status ? { status: filter.status } : { status: 'PUBLISHED' }),
-        ...(filter?.featured !== undefined ? { featured: filter.featured } : {})
-      },
+  async getAll(filter: ProjectListQuery = {}) {
+    const status = filter.status ?? 'PUBLISHED';
+    const featured = filter.featured ?? filter.feature;
+    const paginationRequested = filter.page !== undefined || filter.pageSize !== undefined;
+    const page = filter.page ?? 1;
+    const pageSize = filter.pageSize ?? 6;
+    const baseWhere = {
+      status,
+      ...(featured !== undefined ? { featured } : {}),
+    };
+    const regularProjectWhere = {
+      ...baseWhere,
+      NOT: companyProjectWhere,
+    };
+    const where = {
+      ...baseWhere,
+      ...(filter.category === 'company-work'
+        ? companyProjectWhere
+        : filter.category
+          ? { categoryId: filter.category, NOT: companyProjectWhere }
+          : {}),
+    };
+
+    const projectsQuery = this.fastify.prisma.project.findMany({
+      where,
       include: {
         category: true,
         thumbnail: true,
@@ -25,8 +48,68 @@ export class ProjectService {
         technologies: true,
         phases: { orderBy: { sortOrder: 'asc' } }
       },
-      orderBy: { sortOrder: 'asc' }
+      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+      ...(paginationRequested ? { skip: (page - 1) * pageSize, take: pageSize } : {}),
     });
+
+    if (!paginationRequested) {
+      return {
+        projects: await projectsQuery,
+        pagination: undefined,
+        filters: undefined,
+      };
+    }
+
+    const [projects, total, availableTotal, projectCategories, companyProjectsCount] = await Promise.all([
+      projectsQuery,
+      this.fastify.prisma.project.count({ where }),
+      this.fastify.prisma.project.count({ where: baseWhere }),
+      this.fastify.prisma.projectCategory.findMany({
+        where: { projects: { some: regularProjectWhere } },
+        select: {
+          id: true,
+          name: true,
+          _count: { select: { projects: { where: regularProjectWhere } } },
+        },
+      }),
+      this.fastify.prisma.project.count({
+        where: { ...baseWhere, ...companyProjectWhere },
+      }),
+    ]);
+
+    const categories = [
+      ...(companyProjectsCount > 0
+        ? [{ id: 'company-work', name: 'Company Work', count: companyProjectsCount }]
+        : []),
+      ...projectCategories.map((category) => ({
+        id: category.id,
+        name: category.name,
+        count: category._count.projects,
+      })),
+    ].sort((a, b) => {
+      if (a.id === 'company-work') return -1;
+      if (b.id === 'company-work') return 1;
+      if (b.count !== a.count) return b.count - a.count;
+      return a.name.localeCompare(b.name);
+    });
+
+    const totalPages = Math.ceil(total / pageSize);
+
+    return {
+      projects,
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+      filters: {
+        total: availableTotal,
+        categories,
+      },
+    };
   }
 
   /**

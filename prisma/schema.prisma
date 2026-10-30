@@ -114,9 +114,14 @@ model Media {
   settingsAbout     SiteSettings[] @relation("SettingsAboutImage")
   settingsCv        SiteSettings[] @relation("SettingsCv")
   settingsIntro     SiteSettings[] @relation("SettingsIntroMedia")
+  settingsBrandLogo SiteSettings[] @relation("SettingsBrandLogo")
+  settingsIntroGalleryId    Int?
+  settingsIntroGalleryOrder Int?
+  settingsIntroGallery      SiteSettings? @relation("SettingsIntroGallery", fields: [settingsIntroGalleryId], references: [id], onDelete: SetNull)
   adminProfile      Admin[]        @relation("AdminProfileImage")
 
   @@unique([provider, publicId]) // no duplicate Cloudinary assets (NULLs are allowed repeatedly)
+  @@index([settingsIntroGalleryId, settingsIntroGalleryOrder])
 }
 
 // ═══════════════════════════ PROJECTS ═══════════════════════════
@@ -303,6 +308,9 @@ model SiteSettings {
   aboutImage     Media?  @relation("SettingsAboutImage", fields: [aboutImageId], references: [id], onDelete: SetNull)
   introMediaId   String?
   introMedia     Media?  @relation("SettingsIntroMedia", fields: [introMediaId], references: [id], onDelete: SetNull)
+  introMediaGallery Media[] @relation("SettingsIntroGallery")
+  brandLogoId    String?
+  brandLogo      Media?  @relation("SettingsBrandLogo", fields: [brandLogoId], references: [id], onDelete: SetNull)
   availableForWork Boolean @default(true)
   cvId           String?
   cv             Media?  @relation("SettingsCv", fields: [cvId], references: [id], onDelete: SetNull)

@@ -12,6 +12,9 @@ export class AboutService {
       include: {
         profileImage: true,
         introMedia: true,
+        introMediaGallery: {
+          orderBy: { settingsIntroGalleryOrder: 'asc' },
+        },
       },
     });
 
@@ -27,6 +30,9 @@ export class AboutService {
         include: {
           profileImage: true,
           introMedia: true,
+          introMediaGallery: {
+            orderBy: { settingsIntroGalleryOrder: 'asc' },
+          },
         },
       });
     }
@@ -38,11 +44,14 @@ export class AboutService {
     const resumes = await prisma.resumeDocument.findMany({
       orderBy: { createdAt: 'desc' },
     });
+    const titles = settings.roles?.filter((role) => role.trim()) || [];
+    const professionalTitles = titles.length > 0 ? titles : ['Full Stack Developer'];
 
     return {
       id: settings.id.toString(),
       fullName: settings.ownerName || '',
-      title: settings.roles?.[0] || 'Full Stack Developer',
+      title: professionalTitles[0],
+      titles: professionalTitles,
       tagline: settings.heroIntro || '',
       bio: settings.aboutText || '',
       location: settings.address || '',
@@ -61,9 +70,20 @@ export class AboutService {
             id: settings.introMedia.id,
             url: settings.introMedia.url,
             fileName: settings.introMedia.alt || 'Intro Media',
-            type: settings.introMedia.type?.toLowerCase() === 'video' ? 'video' : 'image',
+            type: settings.introMedia.type === 'VIDEO' ? 'video' : 'image',
           }
         : null,
+      introMediaGallery: (settings.introMediaGallery.length
+        ? settings.introMediaGallery
+        : settings.introMedia
+          ? [settings.introMedia]
+          : []
+      ).map((media) => ({
+        id: media.id,
+        url: media.url,
+        fileName: media.alt || undefined,
+        type: media.type === 'VIDEO' ? 'video' as const : 'image' as const,
+      })),
       socialLinks: socialLinks.map((s) => ({
         id: s.id,
         platform: s.platform,
@@ -86,13 +106,38 @@ export class AboutService {
 
   async updateAbout(data: UpdateAboutInput) {
     const prisma = this.fastify.prisma;
+    const galleryItems = data.introMediaGallery;
+    const galleryIds = galleryItems?.map((media) => media.id) || [];
+    const existingMedia = galleryIds.length
+      ? await prisma.media.findMany({
+          where: { id: { in: galleryIds } },
+          select: { id: true, type: true },
+        })
+      : [];
+    const existingMediaById = new Map(existingMedia.map((media) => [media.id, media]));
 
-    // 1. Upsert SiteSettings
-    await prisma.siteSettings.upsert({
+    if (new Set(galleryIds).size !== galleryIds.length) {
+      throw new Error('The About Me media gallery contains duplicate media items.');
+    }
+
+    if (existingMedia.length !== galleryIds.length) {
+      throw new Error('One or more About Me gallery items do not exist.');
+    }
+
+    if (existingMedia.some((media) => media.type === 'DOCUMENT')) {
+      throw new Error('Only images and videos can be added to the About Me gallery.');
+    }
+
+    const introMedia = galleryItems !== undefined
+      ? galleryItems.find((media) => existingMediaById.get(media.id)?.type === 'VIDEO') || galleryItems[0] || null
+      : data.introMedia;
+    const titles = data.titles?.length ? data.titles : [data.title];
+
+    const settingsUpsert = {
       where: { id: 1 },
       update: {
         ownerName: data.fullName,
-        roles: [data.title],
+        roles: titles,
         heroIntro: data.tagline || null,
         aboutText: data.bio,
         address: data.location || null,
@@ -100,12 +145,12 @@ export class AboutService {
         phone: data.phone || null,
         availableForWork: data.availableForWork ?? true,
         profileImageId: data.avatar?.id || null,
-        introMediaId: data.introMedia?.id || null,
+        introMediaId: introMedia?.id || null,
       },
       create: {
         id: 1,
         ownerName: data.fullName,
-        roles: [data.title],
+        roles: titles,
         heroIntro: data.tagline || null,
         aboutText: data.bio,
         address: data.location || null,
@@ -113,8 +158,26 @@ export class AboutService {
         phone: data.phone || null,
         availableForWork: data.availableForWork ?? true,
         profileImageId: data.avatar?.id || null,
-        introMediaId: data.introMedia?.id || null,
+        introMediaId: introMedia?.id || null,
       },
+    };
+
+    // Keep the gallery relation and the hero's selected media in sync.
+    await prisma.$transaction(async (transaction) => {
+      await transaction.siteSettings.upsert(settingsUpsert);
+      if (galleryItems !== undefined) {
+        await transaction.media.updateMany({
+          where: { settingsIntroGalleryId: 1 },
+          data: { settingsIntroGalleryId: null, settingsIntroGalleryOrder: null },
+        });
+
+        for (const [sortOrder, media] of galleryItems.entries()) {
+          await transaction.media.update({
+            where: { id: media.id },
+            data: { settingsIntroGalleryId: 1, settingsIntroGalleryOrder: sortOrder },
+          });
+        }
+      }
     });
 
     // 2. Synchronize Social Links

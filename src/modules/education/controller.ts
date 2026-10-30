@@ -1,6 +1,6 @@
 import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { EducationService } from './service.js';
-import type { CreateEducationInput, UpdateEducationInput, ReorderEducationInput } from './schema.js';
+import type { CreateEducationInput, EducationListQuery, UpdateEducationInput, ReorderEducationInput } from './schema.js';
 
 /**
  * Controller handling HTTP requests and responses for Education history.
@@ -13,22 +13,18 @@ export class EducationController {
   }
 
   getAll = async (
-    request: FastifyRequest<{ Querystring: { all?: string; isVisible?: string; showOnHome?: string } }>, 
+    request: FastifyRequest<{ Querystring: EducationListQuery }>,
     reply: FastifyReply
   ) => {
     try {
-      const isVisible = request.query?.all === 'true' 
-        ? undefined 
-        : request.query?.isVisible !== undefined 
-          ? request.query.isVisible === 'true' 
-          : true;
-      const showOnHome = request.query?.showOnHome !== undefined 
-        ? request.query.showOnHome === 'true' 
-        : undefined;
+      const isVisible = request.query.all ? undefined : request.query.isVisible ?? true;
+      const showOnHome = request.query.showOnHome;
 
       const education = await this.service.getAll({
-        ...(isVisible !== undefined ? { isVisible } : {}),
-        ...(showOnHome !== undefined ? { showOnHome } : {})
+        all: request.query.all,
+        isVisible,
+        ...(showOnHome !== undefined ? { showOnHome } : {}),
+        ...(request.query.home ? { home: true } : {}),
       });
       reply.send({ success: true, data: education });
     } catch (error: any) {

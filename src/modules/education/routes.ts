@@ -1,6 +1,6 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { EducationController } from './controller.js';
-import { createEducationSchema, updateEducationSchema, educationParamSchema, reorderEducationSchema } from './schema.js';
+import { createEducationSchema, updateEducationSchema, educationParamSchema, reorderEducationSchema, educationListQuerySchema } from './schema.js';
 
 /**
  * Education Routes
@@ -14,6 +14,7 @@ export const educationRoutes: FastifyPluginAsyncZod = async (app) => {
     schema: {
       tags: ['Education'],
       summary: 'Get all education entries',
+      querystring: educationListQuerySchema,
     },
   }, controller.getAll);
 

@@ -2,6 +2,17 @@ import { z } from 'zod';
 
 export const publishStatusEnum = z.enum(['DRAFT', 'PUBLISHED']);
 
+const booleanQueryParam = z.enum(['true', 'false']).transform((value) => value === 'true');
+
+export const projectListQuerySchema = z.object({
+  status: publishStatusEnum.optional(),
+  featured: booleanQueryParam.optional(),
+  feature: booleanQueryParam.optional(),
+  page: z.coerce.number().int().min(1).optional(),
+  pageSize: z.coerce.number().int().min(1).max(50).optional(),
+  category: z.string().min(1).optional(),
+});
+
 export const projectPhaseSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1, 'Phase name is required'),
@@ -54,3 +65,4 @@ export const projectParamSchema = z.object({ id: z.string() });
 
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
+export type ProjectListQuery = z.infer<typeof projectListQuerySchema>;
