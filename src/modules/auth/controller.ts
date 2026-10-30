@@ -31,8 +31,7 @@ export class AuthController {
         .send({ 
           success: true, 
           message: 'Logged in successfully', 
-          admin, 
-          token 
+          admin,
         });
     } catch (error: any) {
       if (error.message === 'Invalid credentials') {
@@ -102,8 +101,7 @@ export class AuthController {
         .send({ 
           success: true, 
           message: 'Profile updated successfully', 
-          admin: updatedAdmin, 
-          token: newToken 
+          admin: updatedAdmin,
         });
     } catch (error: any) {
       if (error.code === 'P2002') {

@@ -7,10 +7,34 @@ import type { CreateEducationInput, UpdateEducationInput } from './schema.js';
 export class EducationService {
   constructor(private fastify: FastifyInstance) {}
 
-  async getAll(filter?: { isVisible?: boolean; showOnHome?: boolean }) {
+  async getAll(filter?: { all?: boolean; isVisible?: boolean; showOnHome?: boolean; home?: boolean }) {
+    const visibleFilter = filter?.all
+      ? {}
+      : filter?.isVisible !== undefined
+        ? { isVisible: filter.isVisible }
+        : { isVisible: true };
+
+    if (filter?.home) {
+      const selectedHomeCount = await this.fastify.prisma.education.count({
+        where: { ...visibleFilter, showOnHome: true },
+      });
+
+      return this.fastify.prisma.education.findMany({
+        where: {
+          ...visibleFilter,
+          ...(selectedHomeCount > 0 ? { showOnHome: true } : {}),
+        },
+        orderBy: [
+          { sortOrder: 'asc' },
+          { startDate: 'desc' }
+        ],
+        take: 3,
+      });
+    }
+
     return await this.fastify.prisma.education.findMany({
       where: {
-        ...(filter?.isVisible !== undefined ? { isVisible: filter.isVisible } : {}),
+        ...visibleFilter,
         ...(filter?.showOnHome !== undefined ? { showOnHome: filter.showOnHome } : {})
       },
       orderBy: [

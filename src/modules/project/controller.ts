@@ -1,6 +1,6 @@
 import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { ProjectService } from './service.js';
-import type { CreateProjectInput, UpdateProjectInput } from './schema.js';
+import type { CreateProjectInput, ProjectListQuery, UpdateProjectInput } from './schema.js';
 
 /**
  * Controller handling HTTP requests and responses for the Projects module.
@@ -14,17 +14,23 @@ export class ProjectController {
   }
 
   getAll = async (
-    request: FastifyRequest<{ Querystring: { status?: 'PUBLISHED' | 'DRAFT'; featured?: string | boolean } }>, 
+    request: FastifyRequest<{ Querystring: ProjectListQuery }>,
     reply: FastifyReply
   ) => {
     try {
-      const featured = request.query?.featured !== undefined 
-        ? (request.query.featured === 'true' || (request.query.featured as any) === true)
-        : undefined;
-      const status = request.query?.status ?? 'PUBLISHED';
-
-      const projects = await this.service.getAll({ status, featured });
-      reply.send({ success: true, data: projects });
+      const result = await this.service.getAll(request.query);
+      reply.send({
+        success: true,
+        data: result.projects,
+        ...(result.pagination
+          ? {
+              meta: {
+                pagination: result.pagination,
+                filters: result.filters,
+              },
+            }
+          : {}),
+      });
     } catch (error: any) {
       reply.status(500).send({ success: false, code: 'INTERNAL_SERVER_ERROR', message: error.message });
     }

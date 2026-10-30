@@ -19,16 +19,19 @@ export const resumeDocumentInputSchema = z.object({
   uploadedAt: z.string().optional(),
 });
 
-export const mediaItemSchema = z.object({
+export const mediaGalleryItemSchema = z.object({
   id: z.string(),
   url: z.string(),
   fileName: z.string().optional().nullable(),
   type: z.enum(['image', 'video', 'document']).optional(),
-}).nullable().optional();
+});
+
+export const mediaItemSchema = mediaGalleryItemSchema.nullable().optional();
 
 export const updateAboutSchema = z.object({
   fullName: z.string().min(1, 'Full name is required'),
   title: z.string().min(1, 'Professional title is required'),
+  titles: z.array(z.string().trim().min(1, 'Professional titles cannot be empty')).optional(),
   tagline: z.string().optional().nullable(),
   bio: z.string().min(10, 'Bio must be at least 10 characters'),
   location: z.string().optional().nullable(),
@@ -37,6 +40,7 @@ export const updateAboutSchema = z.object({
   availableForWork: z.boolean().default(true),
   avatar: mediaItemSchema,
   introMedia: mediaItemSchema,
+  introMediaGallery: z.array(mediaGalleryItemSchema).optional(),
   socialLinks: z.array(socialLinkInputSchema).default([]),
   resumes: z.array(resumeDocumentInputSchema).default([]),
 });

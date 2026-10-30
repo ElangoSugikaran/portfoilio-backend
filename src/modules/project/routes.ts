@@ -1,6 +1,6 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { ProjectController } from './controller.js';
-import { createProjectSchema, updateProjectSchema, projectParamSchema } from './schema.js';
+import { createProjectSchema, updateProjectSchema, projectParamSchema, projectListQuerySchema } from './schema.js';
 
 /**
  * Project Routes
@@ -13,7 +13,8 @@ export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get('/', {
     schema: {
       tags: ['Projects'],
-      summary: 'Get all projects',
+      summary: 'Get projects with optional featured filtering and pagination',
+      querystring: projectListQuerySchema,
     },
   }, controller.getAll);
 
