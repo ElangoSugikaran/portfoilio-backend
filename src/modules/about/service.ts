@@ -1,10 +1,21 @@
 ﻿import type { FastifyInstance } from 'fastify';
 import type { UpdateAboutInput } from './schema.js';
+import { AppError } from '../../lib/errors.js';
+import { cloudinaryService, type CloudinaryResourceType } from '../../services/cloudinary.service.js';
+import { deleteMediaAsset, deleteMediaAssets } from '../../services/media-asset.service.js';
 
 export class AboutService {
   constructor(private fastify: FastifyInstance) {}
 
-  async getAbout() {
+  private getCvFilename(cv: { fileName?: string | null; title?: string | null }): string {
+    const baseName = (cv.fileName || cv.title || 'resume')
+      .replace(/\.pdf$/i, '')
+      .replace(/[^a-zA-Z0-9._-]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'resume';
+    return `${baseName}.pdf`;
+  }
+
+  async getAbout(baseUrl?: string, publicView = false) {
     const prisma = this.fastify.prisma;
 
     let settings = await prisma.siteSettings.findUnique({
@@ -42,10 +53,58 @@ export class AboutService {
     });
 
     const resumes = await prisma.resumeDocument.findMany({
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
     });
     const titles = settings.roles?.filter((role) => role.trim()) || [];
     const professionalTitles = titles.length > 0 ? titles : ['Full Stack Developer'];
+    const base = baseUrl?.replace(/\/+$/g, '') || '';
+    const primaryResume = resumes.find((resume) => resume.isPrimary) || resumes[0];
+    const gallery = (settings.introMediaGallery.length
+      ? settings.introMediaGallery
+      : settings.introMedia
+        ? [settings.introMedia]
+        : []
+    ).map((media) => ({
+      id: media.id,
+      url: media.url,
+      fileName: media.alt || undefined,
+      type: media.type === 'VIDEO' ? 'video' as const : 'image' as const,
+    }));
+
+    if (publicView) {
+      return {
+        fullName: settings.ownerName || '',
+        title: professionalTitles[0],
+        titles: professionalTitles,
+        tagline: settings.heroIntro || '',
+        bio: settings.aboutText || '',
+        location: settings.address || '',
+        email: settings.email || '',
+        phone: settings.phone || '',
+        availableForWork: (settings as any).availableForWork ?? true,
+        avatar: settings.profileImage ? { url: settings.profileImage.url } : null,
+        introMedia: settings.introMedia
+          ? {
+              url: settings.introMedia.url,
+              type: settings.introMedia.type === 'VIDEO' ? 'video' : 'image',
+            }
+          : null,
+        socialLinks: socialLinks
+          .filter((social) => social.isVisible)
+          .map((social) => ({
+            platform: social.platform,
+            url: social.url,
+          })),
+        resumes: primaryResume
+          ? [
+              {
+                downloadUrl: `${base}/api/v1/about/cv/download/${primaryResume.id}`,
+                isPrimary: true,
+              },
+            ]
+          : [],
+      };
+    }
 
     return {
       id: settings.id.toString(),
@@ -73,17 +132,7 @@ export class AboutService {
             type: settings.introMedia.type === 'VIDEO' ? 'video' : 'image',
           }
         : null,
-      introMediaGallery: (settings.introMediaGallery.length
-        ? settings.introMediaGallery
-        : settings.introMedia
-          ? [settings.introMedia]
-          : []
-      ).map((media) => ({
-        id: media.id,
-        url: media.url,
-        fileName: media.alt || undefined,
-        type: media.type === 'VIDEO' ? 'video' as const : 'image' as const,
-      })),
+      introMediaGallery: gallery,
       socialLinks: socialLinks.map((s) => ({
         id: s.id,
         platform: s.platform,
@@ -91,20 +140,123 @@ export class AboutService {
         icon: (s as any).icon || 'Globe',
         active: s.isVisible,
       })),
-      resumes: resumes.map((r) => ({
-        id: r.id,
-        title: r.title,
-        fileId: r.fileId,
-        fileUrl: r.fileUrl,
-        fileName: r.fileName || undefined,
-        fileSize: r.fileSize || undefined,
-        isPrimary: r.isPrimary,
-        uploadedAt: r.uploadedAt,
-      })),
+      resumes: resumes.map((r) => {
+        const downloadUrl = `${base}/api/v1/about/cv/download/${r.id}`;
+        return {
+          id: r.id,
+          title: r.title,
+          fileId: r.fileId,
+          fileUrl: downloadUrl,
+          downloadUrl,
+          viewUrl: `${downloadUrl}?inline=true`,
+          publicId: r.publicId || undefined,
+          resourceType: r.resourceType || 'raw',
+          mimeType: r.mimeType || 'application/pdf',
+          fileName: r.fileName || undefined,
+          fileSize: r.fileSize || undefined,
+          sizeBytes: r.sizeBytes || undefined,
+          isPrimary: r.isPrimary,
+          uploadedAt: r.uploadedAt,
+        };
+      }),
     };
   }
 
-  async updateAbout(data: UpdateAboutInput) {
+  async getCvFile(id: string) {
+    const prisma = this.fastify.prisma;
+    const cv = await prisma.resumeDocument.findUnique({
+      where: { id },
+    });
+
+    if (!cv) {
+      throw AppError.notFound('CV document not found');
+    }
+
+    try {
+      const buffer = await cloudinaryService.fetchAssetBuffer(
+        cv.publicId || cv.fileId,
+        (cv.resourceType as CloudinaryResourceType) || 'raw',
+        cv.fileUrl,
+      );
+
+      return {
+        buffer,
+        filename: this.getCvFilename(cv),
+        cv,
+      };
+    } catch (error: any) {
+      throw AppError.internal(error?.message || 'Could not retrieve the CV file.');
+    }
+  }
+
+  private async syncResumes(data: UpdateAboutInput) {
+    const prisma = this.fastify.prisma;
+    const incoming = data.resumes;
+    if (incoming === undefined) return;
+
+    const existing = await prisma.resumeDocument.findMany();
+    const existingById = new Map(existing.map((cv) => [cv.id, cv]));
+    const incomingIds = new Set(incoming.map((cv) => cv.id).filter((id): id is string => Boolean(id)));
+
+    const removed = existing.filter((cv) => !incomingIds.has(cv.id));
+    for (const cv of removed) {
+      await prisma.resumeDocument.delete({ where: { id: cv.id } });
+      if (cv.publicId) {
+        await cloudinaryService.destroyAsset(
+          cv.publicId,
+          (cv.resourceType as CloudinaryResourceType) || 'raw',
+          this.fastify.log,
+        );
+      } else if (cv.fileId) {
+        // Legacy CVs stored the Media row id in fileId.
+        await deleteMediaAsset(prisma, cv.fileId, this.fastify.log);
+      }
+    }
+
+    for (const [index, cv] of incoming.entries()) {
+      const current = cv.id ? existingById.get(cv.id) : undefined;
+
+      if (current) {
+        await prisma.resumeDocument.update({
+          where: { id: current.id },
+          data: {
+            title: cv.title,
+            isPrimary: index === 0 ? true : cv.isPrimary ?? false,
+          },
+        });
+        continue;
+      }
+
+      const media = cv.fileId
+        ? await prisma.media.findUnique({ where: { id: cv.fileId } }).catch(() => null)
+        : null;
+
+      await prisma.resumeDocument.create({
+        data: {
+          title: cv.title,
+          fileId: cv.fileId,
+          fileUrl: cv.fileUrl,
+          publicId: cv.publicId || media?.publicId || null,
+          resourceType: cv.resourceType || media?.resourceType || 'raw',
+          mimeType: cv.mimeType || 'application/pdf',
+          fileName: cv.fileName || media?.alt || null,
+          fileSize: cv.fileSize || (media?.sizeBytes ? `${Math.round(media.sizeBytes / 1024)} KB` : null),
+          sizeBytes: cv.sizeBytes || media?.sizeBytes || null,
+          isPrimary: index === 0 ? true : cv.isPrimary ?? false,
+          uploadedAt: cv.uploadedAt || new Date().toISOString(),
+        },
+      });
+    }
+
+    const all = await prisma.resumeDocument.findMany({ orderBy: { createdAt: 'desc' } });
+    const primary = all.find((cv) => cv.isPrimary) || all[0];
+    if (primary) {
+      await prisma.resumeDocument.updateMany({ data: { isPrimary: false } });
+      await prisma.resumeDocument.update({ where: { id: primary.id }, data: { isPrimary: true } });
+    }
+  }
+
+  async updateAbout(data: UpdateAboutInput, baseUrl?: string) {
     const prisma = this.fastify.prisma;
     const galleryItems = data.introMediaGallery;
     const galleryIds = galleryItems?.map((media) => media.id) || [];
@@ -128,10 +280,29 @@ export class AboutService {
       throw new Error('Only images and videos can be added to the About Me gallery.');
     }
 
+    const existingSettings = await prisma.siteSettings.findUnique({
+      where: { id: 1 },
+      select: { profileImageId: true, introMediaId: true },
+    });
+    const oldGalleryIds = galleryItems !== undefined
+      ? (await prisma.media.findMany({
+          where: { settingsIntroGalleryId: 1 },
+          select: { id: true },
+        })).map((media) => media.id)
+      : [];
+
     const introMedia = galleryItems !== undefined
       ? galleryItems.find((media) => existingMediaById.get(media.id)?.type === 'VIDEO') || galleryItems[0] || null
       : data.introMedia;
     const titles = data.titles?.length ? data.titles : [data.title];
+    const profileImageId = data.avatar !== undefined
+      ? data.avatar?.id || null
+      : existingSettings?.profileImageId || null;
+    const introMediaId = galleryItems !== undefined
+      ? introMedia?.id || null
+      : data.introMedia !== undefined
+        ? data.introMedia?.id || null
+        : existingSettings?.introMediaId || null;
 
     const settingsUpsert = {
       where: { id: 1 },
@@ -144,8 +315,8 @@ export class AboutService {
         email: data.email,
         phone: data.phone || null,
         availableForWork: data.availableForWork ?? true,
-        profileImageId: data.avatar?.id || null,
-        introMediaId: introMedia?.id || null,
+        profileImageId,
+        introMediaId,
       },
       create: {
         id: 1,
@@ -157,8 +328,8 @@ export class AboutService {
         email: data.email,
         phone: data.phone || null,
         availableForWork: data.availableForWork ?? true,
-        profileImageId: data.avatar?.id || null,
-        introMediaId: introMedia?.id || null,
+        profileImageId,
+        introMediaId,
       },
     };
 
@@ -180,6 +351,23 @@ export class AboutService {
       }
     });
 
+    if (galleryItems !== undefined) {
+      const keptGalleryIds = new Set(galleryIds);
+      await deleteMediaAssets(
+        prisma,
+        oldGalleryIds.filter((mediaId) => !keptGalleryIds.has(mediaId)),
+        this.fastify.log,
+      );
+    }
+
+    if (data.avatar !== undefined && profileImageId !== existingSettings?.profileImageId) {
+      await deleteMediaAsset(prisma, existingSettings?.profileImageId, this.fastify.log);
+    }
+
+    if (introMediaId !== existingSettings?.introMediaId) {
+      await deleteMediaAsset(prisma, existingSettings?.introMediaId, this.fastify.log);
+    }
+
     // 2. Synchronize Social Links
     await prisma.socialLink.deleteMany();
     if (data.socialLinks && data.socialLinks.length > 0) {
@@ -194,22 +382,10 @@ export class AboutService {
       });
     }
 
-    // 3. Synchronize Resumes
-    await prisma.resumeDocument.deleteMany();
-    if (data.resumes && data.resumes.length > 0) {
-      await prisma.resumeDocument.createMany({
-        data: data.resumes.map((r) => ({
-          title: r.title,
-          fileId: r.fileId,
-          fileUrl: r.fileUrl,
-          fileName: r.fileName || null,
-          fileSize: r.fileSize || null,
-          isPrimary: r.isPrimary ?? false,
-          uploadedAt: r.uploadedAt || new Date().toISOString(),
-        })),
-      });
-    }
+    // 3. Synchronize Resumes only when a legacy client explicitly sends them.
+    // The admin dashboard now manages CVs through /api/v1/admin/cvs.
+    await this.syncResumes(data);
 
-    return await this.getAbout();
+    return await this.getAbout(baseUrl);
   }
 }

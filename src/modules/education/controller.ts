@@ -2,6 +2,20 @@ import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { EducationService } from './service.js';
 import type { CreateEducationInput, EducationListQuery, UpdateEducationInput, ReorderEducationInput } from './schema.js';
 
+function toPublicEducation(education: any) {
+  return {
+    id: education.id,
+    title: education.title,
+    institution: education.institution,
+    type: education.type,
+    startDate: education.startDate,
+    endDate: education.endDate,
+    grade: education.grade,
+    description: education.description,
+    icon: education.icon,
+  };
+}
+
 /**
  * Controller handling HTTP requests and responses for Education history.
  */
@@ -17,16 +31,25 @@ export class EducationController {
     reply: FastifyReply
   ) => {
     try {
-      const isVisible = request.query.all ? undefined : request.query.isVisible ?? true;
+      const isAdmin = Boolean(request.user);
       const showOnHome = request.query.showOnHome;
+      const includeHidden = isAdmin && Boolean(request.query.all);
+      const isVisible = includeHidden
+        ? undefined
+        : isAdmin
+          ? request.query.isVisible ?? true
+          : true;
 
       const education = await this.service.getAll({
-        all: request.query.all,
+        all: includeHidden,
         isVisible,
         ...(showOnHome !== undefined ? { showOnHome } : {}),
         ...(request.query.home ? { home: true } : {}),
       });
-      reply.send({ success: true, data: education });
+      reply.send({
+        success: true,
+        data: isAdmin ? education : education.map(toPublicEducation),
+      });
     } catch (error: any) {
       reply.status(500).send({ success: false, code: 'INTERNAL_SERVER_ERROR', message: error.message });
     }
@@ -35,10 +58,13 @@ export class EducationController {
   getById = async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     try {
       const education = await this.service.getById(request.params.id);
-      if (!education) {
+      if (!education || (!education.isVisible && !request.user)) {
         return reply.status(404).send({ success: false, code: 'NOT_FOUND', message: 'Education not found' });
       }
-      reply.send({ success: true, data: education });
+      reply.send({
+        success: true,
+        data: request.user ? education : toPublicEducation(education),
+      });
     } catch (error: any) {
       reply.status(500).send({ success: false, code: 'INTERNAL_SERVER_ERROR', message: error.message });
     }

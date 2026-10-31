@@ -1,15 +1,14 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { SkillsController } from './controller.js';
-import { createSkillSchema, updateSkillSchema, skillParamSchema } from './schema.js';
+import { skillParamSchema } from './schema.js';
 
 /**
- * Skills / Technologies Routes
- * Manages technologies and skill tags displayed across projects and skills sections.
+ * Public skills / technologies routes.
+ * Create, update and delete operations live under /api/v1/admin/skills.
  */
 export const skillsRoutes: FastifyPluginAsyncZod = async (app) => {
   const controller = new SkillsController(app);
 
-  // 🔓 Public:
   app.get('/', {
     schema: {
       tags: ['Skills'],
@@ -24,33 +23,4 @@ export const skillsRoutes: FastifyPluginAsyncZod = async (app) => {
       params: skillParamSchema,
     },
   }, controller.getById);
-
-  // 🔒 Protected:
-  app.post('/', {
-    schema: {
-      tags: ['Skills'],
-      summary: 'Create a new skill',
-      body: createSkillSchema,
-    },
-    preValidation: [app.authenticate],
-  }, controller.create);
-  
-  app.put('/:id', {
-    schema: {
-      tags: ['Skills'],
-      summary: 'Update a skill by ID',
-      params: skillParamSchema,
-      body: updateSkillSchema,
-    },
-    preValidation: [app.authenticate],
-  }, controller.update);
-  
-  app.delete('/:id', {
-    schema: {
-      tags: ['Skills'],
-      summary: 'Delete a skill by ID',
-      params: skillParamSchema,
-    },
-    preValidation: [app.authenticate],
-  }, controller.delete);
 };
