@@ -60,7 +60,9 @@ export async function buildApp() {
   await app.register(errorHandlerPlugin);
 
   // 🚀 Register Routes (API v1)
-  await app.register(authRoutes, { prefix: '/api/v1/auth' });
+  // Login/logout use the admin API namespace, but remain outside adminRoutes
+  // so the authentication hook does not block users who need to log in.
+  await app.register(authRoutes, { prefix: '/api/v1/admin/auth' });
   await app.register(skillsRoutes, { prefix: '/api/v1/skills' });
   await app.register(experienceRoutes, { prefix: '/api/v1/experience' });
   await app.register(certificatesRoutes, { prefix: '/api/v1/certificates' });
