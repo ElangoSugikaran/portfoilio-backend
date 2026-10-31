@@ -26,6 +26,22 @@ export class MessageController {
     }
   };
 
+  getById = async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    try {
+      const message = await this.service.getById(request.params.id);
+      if (!message) {
+        return reply.status(404).send({ success: false, code: 'NOT_FOUND', message: 'Message not found' });
+      }
+      reply.send({ success: true, data: message });
+    } catch (error: any) {
+      reply.status(500).send({
+        success: false,
+        code: 'INTERNAL_SERVER_ERROR',
+        message: error.message || 'Failed to fetch message'
+      });
+    }
+  };
+
   create = async (request: FastifyRequest<{ Body: CreateMessageInput }>, reply: FastifyReply) => {
     try {
       const message = await this.service.create(request.body);

@@ -2,6 +2,20 @@ import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { ExperienceService } from './service.js';
 import type { CreateExperienceInput, UpdateExperienceInput } from './schema.js';
 
+function toPublicExperience(experience: any) {
+  return {
+    id: experience.id,
+    role: experience.role,
+    company: experience.company,
+    companyUrl: experience.companyUrl,
+    location: experience.location,
+    startDate: experience.startDate,
+    endDate: experience.endDate,
+    description: experience.description,
+    icon: experience.icon,
+  };
+}
+
 /**
  * Controller handling HTTP requests and responses for Experience entries.
  */
@@ -17,13 +31,19 @@ export class ExperienceController {
     reply: FastifyReply
   ) => {
     try {
-      const isVisible = request.query?.all === 'true' 
-        ? undefined 
-        : request.query?.isVisible !== undefined 
-          ? request.query.isVisible === 'true' 
-          : true;
+      const isAdmin = Boolean(request.user);
+      const isVisible = isAdmin
+        ? request.query?.all === 'true'
+          ? undefined
+          : request.query?.isVisible !== undefined
+            ? request.query.isVisible === 'true'
+            : true
+        : true;
       const experience = await this.service.getAll(isVisible !== undefined ? { isVisible } : undefined);
-      reply.send({ success: true, data: experience });
+      reply.send({
+        success: true,
+        data: isAdmin ? experience : experience.map(toPublicExperience),
+      });
     } catch (error: any) {
       reply.status(500).send({ success: false, code: 'INTERNAL_SERVER_ERROR', message: error.message });
     }
@@ -32,10 +52,13 @@ export class ExperienceController {
   getById = async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     try {
       const experience = await this.service.getById(request.params.id);
-      if (!experience) {
+      if (!experience || (!experience.isVisible && !request.user)) {
         return reply.status(404).send({ success: false, code: 'NOT_FOUND', message: 'Experience not found' });
       }
-      reply.send({ success: true, data: experience });
+      reply.send({
+        success: true,
+        data: request.user ? experience : toPublicExperience(experience),
+      });
     } catch (error: any) {
       reply.status(500).send({ success: false, code: 'INTERNAL_SERVER_ERROR', message: error.message });
     }

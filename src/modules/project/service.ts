@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { CreateProjectInput, ProjectListQuery, UpdateProjectInput } from './schema.js';
+import { deleteMediaAssets } from '../../services/media-asset.service.js';
 
 const companyProjectWhere = {
   OR: [
@@ -17,13 +18,13 @@ export class ProjectService {
   constructor(private fastify: FastifyInstance) {}
 
   async getAll(filter: ProjectListQuery = {}) {
-    const status = filter.status ?? 'PUBLISHED';
+    const status = filter.all ? undefined : filter.status ?? 'PUBLISHED';
     const featured = filter.featured ?? filter.feature;
     const paginationRequested = filter.page !== undefined || filter.pageSize !== undefined;
     const page = filter.page ?? 1;
     const pageSize = filter.pageSize ?? 6;
     const baseWhere = {
-      status,
+      ...(status ? { status } : {}),
       ...(featured !== undefined ? { featured } : {}),
     };
     const regularProjectWhere = {
@@ -177,8 +178,13 @@ export class ProjectService {
    */
   async update(id: string, data: UpdateProjectInput) {
     const { technologyIds, projectMedia, phases, ...rest } = data;
-    
-    return await this.fastify.prisma.project.update({
+
+    const existing = await this.fastify.prisma.project.findUnique({
+      where: { id },
+      include: { media: { select: { mediaId: true } } },
+    });
+
+    const project = await this.fastify.prisma.project.update({
       where: { id },
       data: {
         ...rest,
@@ -212,14 +218,44 @@ export class ProjectService {
         phases: { orderBy: { sortOrder: 'asc' } }
       }
     });
+
+    if (existing) {
+      const keptMediaIds = new Set((projectMedia ?? []).map((media) => media.mediaId));
+      const removedMediaIds = existing.media
+        .map((media) => media.mediaId)
+        .filter((mediaId) => !keptMediaIds.has(mediaId));
+
+      await deleteMediaAssets(this.fastify.prisma, removedMediaIds, this.fastify.log);
+
+      if (data.thumbnailId !== undefined && data.thumbnailId !== existing.thumbnailId) {
+        await deleteMediaAssets(this.fastify.prisma, [existing.thumbnailId], this.fastify.log);
+      }
+    }
+
+    return project;
   }
 
   /**
    * Delete a project by ID
    */
   async delete(id: string) {
-    return await this.fastify.prisma.project.delete({
+    const existing = await this.fastify.prisma.project.findUnique({
+      where: { id },
+      include: { media: { select: { mediaId: true } } },
+    });
+
+    const project = await this.fastify.prisma.project.delete({
       where: { id }
     });
+
+    if (existing) {
+      await deleteMediaAssets(
+        this.fastify.prisma,
+        [existing.thumbnailId, ...existing.media.map((media) => media.mediaId)],
+        this.fastify.log,
+      );
+    }
+
+    return project;
   }
 }

@@ -1,10 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import type { MultipartFile } from '@fastify/multipart';
-import type { UploadApiResponse } from 'cloudinary';
-import { randomUUID } from 'node:crypto';
 import { PrismaClient, MediaType } from '../../generated/prisma/client.js';
-import { cloudinary } from '../../lib/cloudinary.js';
+import { buildPublicId, cloudinaryService, formatBytes, getFileExtension, type CloudinaryResourceType } from '../../services/cloudinary.service.js';
 import sharp from 'sharp';
+import { AppError } from '../../lib/errors.js';
+
+const MAX_PDF_SIZE = 10 * 1024 * 1024;
 
 /**
  * Service managing media file compression (Sharp), Cloudinary upload/deletion,
@@ -12,23 +13,37 @@ import sharp from 'sharp';
  */
 export class MediaService {
   private prisma: PrismaClient;
+  private fastify: FastifyInstance;
 
   constructor(fastify: FastifyInstance) {
     this.prisma = fastify.prisma;
+    this.fastify = fastify;
   }
 
   async uploadFile(file: MultipartFile) {
+    const originalFileName = file.filename.split(/[\\/]/).pop() || 'file';
+    const extension = getFileExtension(originalFileName);
     const isImage = file.mimetype.startsWith('image/');
     const isVideo = file.mimetype.startsWith('video/');
-    
+    const isPdf = file.mimetype === 'application/pdf' && extension === '.pdf';
+
+    if (!isImage && !isVideo && !isPdf) {
+      throw AppError.badRequest('Only image, video, and PDF files are supported.');
+    }
+
     let buffer = await file.toBuffer();
-    let resourceType: 'image' | 'video' | 'raw' = 'raw';
-    let mediaType: MediaType = 'DOCUMENT';
+
+    if (isPdf && buffer.length > MAX_PDF_SIZE) {
+      throw AppError.badRequest('PDF file size must not exceed 10MB.');
+    }
+
+    let resourceType: CloudinaryResourceType;
+    let mediaType: MediaType;
+    let publicId: string | undefined;
 
     if (isImage) {
       resourceType = 'image';
       mediaType = 'IMAGE';
-      // Compress and convert to webp if it's an image
       buffer = await sharp(buffer)
         .resize(1920, 1920, { fit: 'inside', withoutEnlargement: true })
         .webp({ quality: 80 })
@@ -36,40 +51,22 @@ export class MediaService {
     } else if (isVideo) {
       resourceType = 'video';
       mediaType = 'VIDEO';
-    } else if (file.mimetype === 'application/pdf') {
+    } else {
       resourceType = 'raw';
       mediaType = 'DOCUMENT';
+      // Raw Cloudinary assets need the extension in the public_id or downloads
+      // arrive with a random name and no file extension.
+      publicId = buildPublicId('portfolio/documents', originalFileName, '.pdf');
     }
 
-    const originalFileName = file.filename.split(/[\\/]/).pop() || 'file';
-    const fileExtension = originalFileName.match(/\.[a-zA-Z0-9]{1,10}$/)?.[0].toLowerCase() || '';
-    const safeFileBaseName = originalFileName
-      .slice(0, originalFileName.length - fileExtension.length)
-      .replace(/[^a-zA-Z0-9_-]+/g, '-') || 'file';
-    const uploadOptions = {
-      resource_type: resourceType,
-      folder: 'portfolio',
-      ...(mediaType === 'DOCUMENT'
-        ? {
-            public_id: `${safeFileBaseName}-${randomUUID()}${fileExtension}`,
-          }
-        : {}),
-    };
-
-    // Raw Cloudinary assets need the extension in the public ID for reliable downloads.
-    const uploadResult = await new Promise<UploadApiResponse>((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        uploadOptions,
-        (error, result) => {
-          if (error || !result) return reject(error || new Error('Upload failed'));
-          resolve(result);
-        }
-      );
-      stream.end(buffer);
+    const uploadResult = await cloudinaryService.uploadBuffer({
+      buffer,
+      resourceType,
+      folder: publicId ? undefined : 'portfolio',
+      publicId,
     });
 
-    // Save to Prisma Database
-    const media = await this.prisma.media.create({
+    return this.prisma.media.create({
       data: {
         type: mediaType,
         provider: 'CLOUDINARY',
@@ -79,25 +76,27 @@ export class MediaService {
         sizeBytes: uploadResult.bytes,
         width: uploadResult.width,
         height: uploadResult.height,
-        alt: mediaType === 'DOCUMENT' ? originalFileName : undefined,
-      }
+        alt: isPdf ? originalFileName : undefined,
+      },
     });
-
-    return media;
   }
 
   async deleteFile(id: string): Promise<void> {
     const media = await this.prisma.media.findUnique({ where: { id } });
-    if (!media) throw new Error('Media not found');
+    if (!media) throw AppError.notFound('Media not found');
 
-    // Remove from DB first
     await this.prisma.media.delete({ where: { id } });
 
-    // Then remove from Cloudinary
     if (media.provider === 'CLOUDINARY' && media.publicId) {
-      await cloudinary.uploader.destroy(media.publicId, { 
-        resource_type: media.resourceType || 'image' 
-      });
+      await cloudinaryService.destroyAsset(
+        media.publicId,
+        (media.resourceType as CloudinaryResourceType) || 'image',
+        this.fastify.log,
+      );
     }
+  }
+
+  formatSize(bytes: number): string {
+    return formatBytes(bytes);
   }
 }

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { UpdateSettingsInput } from './schema.js';
+import { deleteMediaAsset } from '../../services/media-asset.service.js';
 
 const settingsSelection = {
   id: true,
@@ -53,6 +54,17 @@ export class SettingsService {
     };
   }
 
+  async getPublicSettings() {
+    const settings = await this.getSettings();
+
+    return {
+      brandLogo: settings.brandLogo ? { url: settings.brandLogo.url } : null,
+      experienceFallbackText: settings.experienceFallbackText,
+      seoTitle: settings.seoTitle,
+      seoDescription: settings.seoDescription,
+    };
+  }
+
   async updateSettings(data: UpdateSettingsInput) {
     if (data.brandLogoId) {
       const logo = await this.fastify.prisma.media.findUnique({
@@ -63,6 +75,11 @@ export class SettingsService {
         throw new Error('The selected site logo must be an existing image.');
       }
     }
+
+    const existing = await this.fastify.prisma.siteSettings.findUnique({
+      where: { id: 1 },
+      select: { brandLogoId: true },
+    });
 
     await this.fastify.prisma.siteSettings.upsert({
       where: { id: 1 },
@@ -75,6 +92,10 @@ export class SettingsService {
       },
       select: settingsSelection,
     });
+
+    if (data.brandLogoId !== undefined && data.brandLogoId !== existing?.brandLogoId) {
+      await deleteMediaAsset(this.fastify.prisma, existing?.brandLogoId, this.fastify.log);
+    }
 
     return this.getSettings();
   }

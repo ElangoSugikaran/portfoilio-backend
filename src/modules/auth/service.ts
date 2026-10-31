@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import bcrypt from 'bcrypt';
 import type { LoginInput, UpdatePasswordInput, UpdateProfileInput } from './schema.js';
+import { deleteMediaAsset } from '../../services/media-asset.service.js';
 
 /**
  * Service managing admin authentication, password hashing, and credentials.
@@ -90,6 +91,11 @@ export class AuthService {
       updateData.profileImageId = input.profileImageId;
     }
 
+    const existing = await this.fastify.prisma.admin.findUnique({
+      where: { id: adminId },
+      select: { profileImageId: true },
+    });
+
     const admin = await this.fastify.prisma.admin.update({
       where: { id: adminId },
       data: updateData,
@@ -103,6 +109,10 @@ export class AuthService {
         updatedAt: true,
       }
     });
+
+    if (input.profileImageId !== undefined && input.profileImageId !== existing?.profileImageId) {
+      await deleteMediaAsset(this.fastify.prisma, existing?.profileImageId, this.fastify.log);
+    }
 
     return admin;
   }

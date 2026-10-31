@@ -6,6 +6,7 @@ const booleanQueryParam = z.enum(['true', 'false']).transform((value) => value =
 
 export const projectListQuerySchema = z.object({
   status: publishStatusEnum.optional(),
+  all: booleanQueryParam.optional(),
   featured: booleanQueryParam.optional(),
   feature: booleanQueryParam.optional(),
   page: z.coerce.number().int().min(1).optional(),

@@ -21,6 +21,15 @@ export class SettingsController {
     }
   };
 
+  getPublicSettings = async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const settings = await this.service.getPublicSettings();
+      reply.send({ success: true, data: settings });
+    } catch (error: any) {
+      reply.status(500).send({ success: false, code: 'INTERNAL_SERVER_ERROR', message: error.message });
+    }
+  };
+
   updateSettings = async (request: FastifyRequest<{ Body: UpdateSettingsInput }>, reply: FastifyReply) => {
     try {
       const settings = await this.service.updateSettings(request.body);
