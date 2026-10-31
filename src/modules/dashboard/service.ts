@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { DashboardOverviewResponse } from './schema.js';
+import { analyticsService } from '../../services/analytics.service.js';
 
 function formatRelativeTime(date: Date): string {
   const now = new Date();
@@ -86,6 +87,8 @@ export class DashboardService {
       }),
     ]);
 
+    const analytics = await analyticsService.getOverview(this.fastify.log);
+
     // Format UI Stats cards
     const stats: DashboardOverviewResponse['stats'] = [
       {
@@ -101,10 +104,14 @@ export class DashboardService {
         description: messageToday > 0 ? `${messageToday} new today` : `${messageTotal} total received`,
       },
       {
-        title: 'Profile Views',
-        value: '1,234', // Baseline metric until visitor tracking is active
+        title: 'Page Views',
+        value: analytics.status === 'connected' ? analytics.totals.pageViews.toLocaleString() : '—',
         icon: 'Eye',
-        description: '+15% from last month',
+        description: analytics.status === 'connected'
+          ? 'Last 30 days · Google Analytics'
+          : analytics.status === 'not_configured'
+            ? 'Connect Google Analytics to see visitor data'
+            : 'Google Analytics is temporarily unavailable',
       },
       {
         title: 'Certifications',
@@ -164,10 +171,11 @@ export class DashboardService {
           newToday: messageToday,
         },
         profileViews: {
-          total: 1234,
-          trend: '+15% from last month',
-          isTrackingActive: false,
+          total: analytics.totals.pageViews,
+          trend: analytics.range,
+          isTrackingActive: analytics.status === 'connected',
         },
+        analytics,
         certificates: {
           total: certTotal,
           academic: certAcademic,
