@@ -1,4 +1,5 @@
 import type { UploadApiResponse } from 'cloudinary';
+import { randomUUID } from 'node:crypto';
 import { cloudinary } from '../lib/cloudinary.js';
 
 export type CloudinaryResourceType = 'image' | 'video' | 'raw';
@@ -35,8 +36,7 @@ export function sanitizeFileName(fileName: string): string {
 export function buildPublicId(folder: string, originalFileName: string, extension?: string): string {
   const safeName = sanitizeFileName(originalFileName);
   const ext = extension ?? getFileExtension(originalFileName);
-  const timestamp = Date.now();
-  return `${folder.replace(/\/+$/g, '')}/${safeName}-${timestamp}${ext}`;
+  return `${folder.replace(/\/+$/g, '')}/${safeName}-${randomUUID()}${ext}`;
 }
 
 export function formatBytes(bytes: number): string {
