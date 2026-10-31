@@ -1,33 +1,24 @@
 ﻿import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { AboutController } from './controller.js';
-import { updateAboutSchema } from './schema.js';
 
+/**
+ * Public About Me routes.
+ * Updates and CV management live under /api/v1/admin.
+ */
 export const aboutRoutes: FastifyPluginAsyncZod = async (app) => {
   const controller = new AboutController(app);
 
-  // Public: Get About Me details for public portfolio or initial admin view
   app.get('/', {
     schema: {
       tags: ['About'],
       summary: 'Get About Me information, CVs, and social links',
     },
-  }, controller.getAbout);
+  }, controller.getPublicAbout);
 
-  // Public alias for portfolio
-  app.get('/public', {
+  app.get('/cv/download/:id', {
     schema: {
       tags: ['About'],
-      summary: 'Get public portfolio about information',
+      summary: 'Download a CV as a PDF (use ?inline=true to preview)',
     },
-  }, controller.getAbout);
-
-  // Protected: Update About Me details (Admin authenticated)
-  app.put('/', {
-    schema: {
-      tags: ['About'],
-      summary: 'Update About Me profile details, social links, and CV documents',
-      body: updateAboutSchema,
-    },
-    preValidation: [app.authenticate],
-  }, controller.updateAbout);
+  }, controller.downloadCv);
 };

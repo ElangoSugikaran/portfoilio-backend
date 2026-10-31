@@ -13,8 +13,12 @@ export const resumeDocumentInputSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   fileId: z.string().min(1, 'File ID is required'),
   fileUrl: z.string().url('Must be a valid URL'),
+  publicId: z.string().optional().nullable(),
+  resourceType: z.string().optional().nullable(),
+  mimeType: z.string().optional().nullable(),
   fileName: z.string().optional().nullable(),
   fileSize: z.string().optional().nullable(),
+  sizeBytes: z.number().int().optional().nullable(),
   isPrimary: z.boolean().default(false),
   uploadedAt: z.string().optional(),
 });
@@ -42,7 +46,7 @@ export const updateAboutSchema = z.object({
   introMedia: mediaItemSchema,
   introMediaGallery: z.array(mediaGalleryItemSchema).optional(),
   socialLinks: z.array(socialLinkInputSchema).default([]),
-  resumes: z.array(resumeDocumentInputSchema).default([]),
+  resumes: z.array(resumeDocumentInputSchema).optional(),
 });
 
 export type UpdateAboutInput = z.infer<typeof updateAboutSchema>;

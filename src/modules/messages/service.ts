@@ -18,6 +18,12 @@ export class MessageService {
     });
   }
 
+  async getById(id: string) {
+    return await this.fastify.prisma.message.findUnique({
+      where: { id }
+    });
+  }
+
   async create(data: CreateMessageInput) {
     // 1. Save to database as PENDING
     const message = await this.fastify.prisma.message.create({

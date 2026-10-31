@@ -5,8 +5,8 @@ export const updateSettingsSchema = z.object({
   brandLogoId: z.string().optional().nullable(),
   seoTitle: z.string().optional().nullable(),
   seoDescription: z.string().optional().nullable(),
-  showExperience: z.boolean().default(true),
-  showCertificates: z.boolean().default(true),
-}).partial();
+  showExperience: z.boolean().optional(),
+  showCertificates: z.boolean().optional(),
+});
 
 export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;

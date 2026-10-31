@@ -16,10 +16,9 @@ import { certificatesRoutes } from "./modules/certificates/routes.js";
 import { projectRoutes } from "./modules/project/routes.js";
 import { settingsRoutes } from "./modules/settings/routes.js";
 import { aboutRoutes } from "./modules/about/routes.js";
-import { mediaRoutes } from "./modules/media/routes.js";
 import { educationRoutes } from "./modules/education/routes.js";
 import { messageRoutes } from "./modules/messages/routes.js";
-import { dashboardRoutes } from "./modules/dashboard/routes.js";
+import { adminRoutes } from "./routes/admin/index.js";
 
 export async function buildApp() {
   const app = Fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
@@ -37,7 +36,8 @@ export async function buildApp() {
   await app.register(cors, {
     origin: true,
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    exposedHeaders: ['Content-Disposition'],
   });
 
   await app.register(fastifyMultipart, {
@@ -67,10 +67,11 @@ export async function buildApp() {
   await app.register(projectRoutes, { prefix: '/api/v1/projects' });
   await app.register(settingsRoutes, { prefix: '/api/v1/settings' });
   await app.register(aboutRoutes, { prefix: '/api/v1/about' });
-  await app.register(mediaRoutes, { prefix: '/api/v1/media' });
   await app.register(educationRoutes, { prefix: '/api/v1/education' });
   await app.register(messageRoutes, { prefix: '/api/v1/messages' });
-  await app.register(dashboardRoutes, { prefix: '/api/v1/dashboard' });
+
+  // All admin-only endpoints share one router-level authentication hook.
+  await app.register(adminRoutes, { prefix: '/api/v1/admin' });
 
   // Root route so localhost:8000 doesn't return 404
   app.get("/", async () => {

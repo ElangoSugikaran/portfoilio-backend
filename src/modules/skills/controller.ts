@@ -2,6 +2,15 @@ import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { SkillsService } from './service.js';
 import type { CreateSkillInput, UpdateSkillInput } from './schema.js';
 
+function toPublicSkill(skill: any) {
+  return {
+    id: skill.id,
+    name: skill.name,
+    category: skill.category,
+    icon: skill.icon,
+  };
+}
+
 /**
  * Controller handling HTTP requests and responses for the Skills module.
  * Formats responses for frontend consumption and toast notifications.
@@ -18,13 +27,19 @@ export class SkillsController {
     reply: FastifyReply
   ) => {
     try {
-      const showInSkills = request.query?.all === 'true' 
-        ? undefined 
-        : request.query?.showInSkills !== undefined 
-          ? request.query.showInSkills === 'true' 
-          : true;
+      const isAdmin = Boolean(request.user);
+      const showInSkills = isAdmin
+        ? request.query?.all === 'true'
+          ? undefined
+          : request.query?.showInSkills !== undefined
+            ? request.query.showInSkills === 'true'
+            : true
+        : true;
       const skills = await this.service.getAll(showInSkills !== undefined ? { showInSkills } : undefined);
-      reply.send({ success: true, data: skills });
+      reply.send({
+        success: true,
+        data: isAdmin ? skills : skills.map(toPublicSkill),
+      });
     } catch (error: any) {
       reply.status(500).send({ success: false, code: 'INTERNAL_SERVER_ERROR', message: error.message });
     }
@@ -33,10 +48,10 @@ export class SkillsController {
   getById = async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     try {
       const skill = await this.service.getById(request.params.id);
-      if (!skill) {
+      if (!skill || (!skill.showInSkills && !request.user)) {
         return reply.status(404).send({ success: false, code: 'NOT_FOUND', message: 'Skill not found' });
       }
-      reply.send({ success: true, data: skill });
+      reply.send({ success: true, data: request.user ? skill : toPublicSkill(skill) });
     } catch (error: any) {
       reply.status(500).send({ success: false, code: 'INTERNAL_SERVER_ERROR', message: error.message });
     }

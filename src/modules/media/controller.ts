@@ -1,6 +1,7 @@
 import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { MediaService } from './service.js';
 import type { DeleteMediaParams } from './schema.js';
+import { AppError } from '../../lib/errors.js';
 
 /**
  * Controller handling multipart file uploads and media deletion.
@@ -29,11 +30,20 @@ export class MediaController {
         message: 'File uploaded successfully', 
         data: media 
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      if (error instanceof AppError) {
+        return reply.status(error.statusCode).send({
+          success: false,
+          code: error.code,
+          message: error.message,
+        });
+      }
+
+      request.log.error(error, 'Failed to upload media file');
       reply.status(500).send({ 
         success: false, 
         code: 'INTERNAL_SERVER_ERROR',
-        message: error.message || 'Upload failed' 
+        message: 'Upload failed',
       });
     }
   };

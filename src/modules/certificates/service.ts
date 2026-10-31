@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { CreateCertificateInput, UpdateCertificateInput } from './schema.js';
+import { deleteMediaAsset } from '../../services/media-asset.service.js';
 
 /**
  * Service managing academic and digital certificates with media image relations.
@@ -40,16 +41,36 @@ export class CertificatesService {
   }
 
   async update(id: string, data: UpdateCertificateInput) {
-    return await this.fastify.prisma.certificate.update({
+    const existing = await this.fastify.prisma.certificate.findUnique({
+      where: { id },
+      select: { imageId: true },
+    });
+
+    const certificate = await this.fastify.prisma.certificate.update({
       where: { id },
       data,
       include: { image: true }
     });
+
+    if (existing && data.imageId && data.imageId !== existing.imageId) {
+      await deleteMediaAsset(this.fastify.prisma, existing.imageId, this.fastify.log);
+    }
+
+    return certificate;
   }
 
   async delete(id: string) {
-    return await this.fastify.prisma.certificate.delete({
+    const existing = await this.fastify.prisma.certificate.findUnique({
+      where: { id },
+      select: { imageId: true },
+    });
+
+    const certificate = await this.fastify.prisma.certificate.delete({
       where: { id }
     });
+
+    await deleteMediaAsset(this.fastify.prisma, existing?.imageId, this.fastify.log);
+
+    return certificate;
   }
 }

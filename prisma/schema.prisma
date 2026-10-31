@@ -329,14 +329,21 @@ model SocialLink {
 
 
 model ResumeDocument {
-  id         String   @id @default(cuid())
-  title      String
-  fileId     String
-  fileUrl    String
-  fileName   String?
-  fileSize   String?
-  isPrimary  Boolean  @default(false)
-  uploadedAt String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id           String   @id @default(cuid())
+  title        String // admin label: "Full Stack Resume", "Frontend Resume"...
+  fileId       String // Cloudinary public_id (kept for backwards compatibility)
+  fileUrl      String // Cloudinary secure_url
+  publicId     String? // Cloudinary public_id, needed for replace/delete
+  resourceType String?  @default("raw") // Cloudinary resource_type ("raw" for PDFs)
+  mimeType     String?  @default("application/pdf")
+  fileName     String? // original upload file name
+  fileSize     String? // human readable size, kept for the public API
+  sizeBytes    Int? // exact size used by the admin UI
+  fileHash     String?  @unique // SHA-256, prevents duplicate CV uploads
+  isPrimary    Boolean  @default(false)
+  uploadedAt   String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([isPrimary])
 }

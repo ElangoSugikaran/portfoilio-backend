@@ -1,15 +1,14 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { ProjectController } from './controller.js';
-import { createProjectSchema, updateProjectSchema, projectParamSchema, projectListQuerySchema } from './schema.js';
+import { projectParamSchema, projectListQuerySchema } from './schema.js';
 
 /**
- * Project Routes
- * Manages portfolio showcase projects, tags, media associations, and timeline phases.
+ * Public project routes.
+ * Create, update and delete operations live under /api/v1/admin/projects.
  */
 export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
   const controller = new ProjectController(app);
 
-  // 🔓 Public:
   app.get('/', {
     schema: {
       tags: ['Projects'],
@@ -25,33 +24,4 @@ export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
       params: projectParamSchema,
     },
   }, controller.getById);
-
-  // 🔒 Protected:
-  app.post('/', {
-    schema: {
-      tags: ['Projects'],
-      summary: 'Create a new project',
-      body: createProjectSchema,
-    },
-    preValidation: [app.authenticate],
-  }, controller.create);
-  
-  app.put('/:id', {
-    schema: {
-      tags: ['Projects'],
-      summary: 'Update an existing project by ID',
-      params: projectParamSchema,
-      body: updateProjectSchema,
-    },
-    preValidation: [app.authenticate],
-  }, controller.update);
-  
-  app.delete('/:id', {
-    schema: {
-      tags: ['Projects'],
-      summary: 'Delete a project by ID',
-      params: projectParamSchema,
-    },
-    preValidation: [app.authenticate],
-  }, controller.delete);
 };
