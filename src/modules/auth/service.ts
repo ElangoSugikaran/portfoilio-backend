@@ -1,7 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import bcrypt from 'bcrypt';
+import { randomBytes } from 'node:crypto';
 import type { LoginInput, UpdatePasswordInput, UpdateProfileInput } from './schema.js';
 import { deleteMediaAsset } from '../../services/media-asset.service.js';
+import { ADMIN_SESSION_MAX_AGE_SECONDS, hashSessionToken } from './session.js';
+
+// Use the same expensive password check when an email is unknown to reduce
+// account enumeration through response timing.
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync('not-a-real-admin-password', 12);
 
 /**
  * Service managing admin authentication, password hashing, and credentials.
@@ -14,20 +20,27 @@ export class AuthService {
       where: { email: input.email },
       include: { profileImage: true }
     });
-
-    if (!admin) {
+    const isValid = await bcrypt.compare(input.password, admin?.passwordHash ?? DUMMY_PASSWORD_HASH);
+    if (!admin || !isValid) {
       throw new Error('Invalid credentials');
     }
 
-    const isValid = await bcrypt.compare(input.password, admin.passwordHash);
-    if (!isValid) {
-      throw new Error('Invalid credentials');
-    }
-
-    // Sign token payload
-    const token = this.fastify.jwt.sign({ 
-      id: admin.id, 
-      email: admin.email 
+    const token = randomBytes(32).toString('base64url');
+    const now = new Date();
+    await this.fastify.prisma.adminSession.deleteMany({
+      where: {
+        OR: [
+          { expiresAt: { lte: now } },
+          { lastSeenAt: { lte: new Date(now.getTime() - 30 * 60 * 1000) } },
+        ],
+      },
+    });
+    await this.fastify.prisma.adminSession.create({
+      data: {
+        tokenHash: hashSessionToken(token),
+        adminId: admin.id,
+        expiresAt: new Date(now.getTime() + ADMIN_SESSION_MAX_AGE_SECONDS * 1000),
+      },
     });
 
     return { 
@@ -73,14 +86,32 @@ export class AuthService {
       throw new Error('Incorrect current password');
     }
 
-    const newPasswordHash = await bcrypt.hash(input.newPassword, 10);
+    const newPasswordHash = await bcrypt.hash(input.newPassword, 12);
+    const token = randomBytes(32).toString('base64url');
+    const now = new Date();
+    await this.fastify.prisma.$transaction([
+      this.fastify.prisma.admin.update({
+        where: { id: adminId },
+        data: { passwordHash: newPasswordHash },
+      }),
+      this.fastify.prisma.adminSession.deleteMany({ where: { adminId } }),
+      this.fastify.prisma.adminSession.create({
+        data: {
+          tokenHash: hashSessionToken(token),
+          adminId,
+          expiresAt: new Date(now.getTime() + ADMIN_SESSION_MAX_AGE_SECONDS * 1000),
+        },
+      }),
+    ]);
 
-    await this.fastify.prisma.admin.update({
-      where: { id: adminId },
-      data: { passwordHash: newPasswordHash }
+    return { token };
+  }
+
+  async logout(token: string | undefined) {
+    if (!token) return;
+    await this.fastify.prisma.adminSession.deleteMany({
+      where: { tokenHash: hashSessionToken(token) },
     });
-
-    return true;
   }
 
   async updateProfile(adminId: string, input: UpdateProfileInput) {

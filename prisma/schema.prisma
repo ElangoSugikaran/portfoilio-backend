@@ -70,7 +70,7 @@ enum EmailStatus {
 }
 
 // ═══════════════════════════ ADMIN ═══════════════════════════
-// Only for a self-built login (Fastify + JWT/cookie). DELETE this model if you use Clerk/Auth.js.
+// Only for a self-built login (Fastify + opaque database-backed sessions).
 // Single admin: seed one row, never build a sign-up route.
 
 model Admin {
@@ -80,8 +80,23 @@ model Admin {
   name           String?
   profileImageId String?
   profileImage   Media?   @relation("AdminProfileImage", fields: [profileImageId], references: [id], onDelete: SetNull)
+  sessions       AdminSession[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+// Only a one-way hash of the random cookie value is stored in the database.
+model AdminSession {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  adminId    String
+  admin      Admin     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  expiresAt  DateTime
+
+  @@index([adminId])
+  @@index([expiresAt])
 }
 
 // ═══════════════════════════ MEDIA (Cloudinary) ═══════════════════════════
