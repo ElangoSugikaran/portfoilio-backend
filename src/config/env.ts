@@ -6,9 +6,17 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url("DATABASE_URL must be a valid URL"),
   PORT: z.string().default("8000").transform(Number),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+  CORS_ORIGINS: z.string()
+    .default('http://localhost:5173,http://localhost:5174')
+    .transform((value) => value.split(',').map((origin) => origin.trim()).filter(Boolean))
+    .pipe(z.array(z.string().url()).min(1, 'CORS_ORIGINS must contain at least one valid origin'))
+    .transform((origins) => origins.map((origin) => new URL(origin).origin)),
+  ADMIN_ORIGINS: z.string()
+    .default('http://localhost:5173')
+    .transform((value) => value.split(',').map((origin) => origin.trim()).filter(Boolean))
+    .pipe(z.array(z.string().url()).min(1, 'ADMIN_ORIGINS must contain at least one valid origin'))
+    .transform((origins) => origins.map((origin) => new URL(origin).origin)),
   CLOUDINARY_URL: z.string().url("CLOUDINARY_URL must be a valid URL starting with cloudinary://"),
-  JWT_SECRET: z.string().min(32, "JWT secret must be at least 32 characters"),
-  COOKIE_SECRET: z.string().min(32, "COOKIE secret must be at least 32 characters"),
   RESEND_API_KEY: z.string().min(1, "RESEND_API_KEY is required"),
   CONTACT_EMAIL_TO: z.string().email("CONTACT_EMAIL_TO must be a valid email"),
   GA4_PROPERTY_ID: z.string().regex(/^\d+$/, "GA4_PROPERTY_ID must be a numeric property ID").optional(),
@@ -16,6 +24,33 @@ const envSchema = z.object({
   GA4_PRIVATE_KEY: z.string().min(1, "GA4_PRIVATE_KEY cannot be empty").optional()
     .transform((key) => key?.replace(/\\n/g, '\n')),
 }).superRefine((values, context) => {
+  if (values.NODE_ENV === 'production' && !process.env.CORS_ORIGINS?.trim()) {
+    context.addIssue({
+      code: 'custom',
+      path: ['CORS_ORIGINS'],
+      message: 'CORS_ORIGINS must be explicitly configured in production.',
+    });
+  }
+
+  if (values.NODE_ENV === 'production' && !process.env.ADMIN_ORIGINS?.trim()) {
+    context.addIssue({
+      code: 'custom',
+      path: ['ADMIN_ORIGINS'],
+      message: 'ADMIN_ORIGINS must be explicitly configured in production.',
+    });
+  }
+
+  const corsOrigins = new Set(values.CORS_ORIGINS);
+  for (const origin of values.ADMIN_ORIGINS) {
+    if (!corsOrigins.has(origin)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['ADMIN_ORIGINS'],
+        message: `Admin origin ${origin} must also be included in CORS_ORIGINS.`,
+      });
+    }
+  }
+
   const analyticsCredentials = [values.GA4_PROPERTY_ID, values.GA4_CLIENT_EMAIL, values.GA4_PRIVATE_KEY];
   const configuredCount = analyticsCredentials.filter(Boolean).length;
   if (configuredCount > 0 && configuredCount < analyticsCredentials.length) {

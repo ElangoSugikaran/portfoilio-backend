@@ -31,17 +31,11 @@ export default fp(async (server) => {
       ],
       components: {
         securitySchemes: {
-          bearerAuth: {
-            type: 'http',
-            scheme: 'bearer',
-            bearerFormat: 'JWT',
-            description: 'Enter your JWT token as: Bearer <token>',
-          },
           cookieAuth: {
             type: 'apiKey',
             in: 'cookie',
-            name: 'admin_token',
-            description: 'HTTP-Only session cookie',
+            name: 'admin_session',
+            description: 'Opaque HttpOnly admin session cookie',
           },
         },
       },

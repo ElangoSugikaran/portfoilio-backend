@@ -19,22 +19,59 @@ import { aboutRoutes } from "./modules/about/routes.js";
 import { educationRoutes } from "./modules/education/routes.js";
 import { messageRoutes } from "./modules/messages/routes.js";
 import { adminRoutes } from "./routes/admin/index.js";
+import { env } from "./config/env.js";
 
 export async function buildApp() {
-  const app = Fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
+  const app = Fastify({
+    trustProxy: env.NODE_ENV === 'production',
+    logger: {
+      redact: [
+        'req.headers.cookie',
+        'req.headers.authorization',
+        'req.body.password',
+        'req.body.currentPassword',
+        'req.body.newPassword',
+      ],
+    },
+  }).withTypeProvider<ZodTypeProvider>();
+  const allowedOrigins = new Set(env.CORS_ORIGINS);
+  const allowedAdminOrigins = new Set(env.ADMIN_ORIGINS);
 
   // Add Zod compilers
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
 
   // Register security plugins
-  // Note: contentSecurityPolicy is disabled to allow Swagger UI scripts and inline stylesheets
-  await app.register(helmet, {
-    contentSecurityPolicy: false,
+  // Keep CSP active in production. Swagger is only enabled in development.
+  await app.register(helmet, env.NODE_ENV === 'production' ? {} : { contentSecurityPolicy: false });
+
+  app.addHook('onRequest', async (request, reply) => {
+    const origin = request.headers.origin;
+    if (origin && !allowedOrigins.has(origin)) {
+      return reply.status(403).send({
+        success: false,
+        code: 'ORIGIN_NOT_ALLOWED',
+        message: 'This origin is not allowed to access the API.',
+      });
+    }
+
+    // Cookies are sent automatically by browsers. Require an allowed Origin for
+    // state-changing admin requests to prevent cross-site request forgery.
+    if (
+      (request.url === '/api/v1/admin' || request.url.startsWith('/api/v1/admin/')) &&
+      ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method) &&
+      (!origin || !allowedAdminOrigins.has(origin))
+    ) {
+      return reply.status(403).send({
+        success: false,
+        code: 'ADMIN_ORIGIN_NOT_ALLOWED',
+        message: 'This request must come from the configured admin dashboard origin.',
+      });
+    }
   });
 
   await app.register(cors, {
-    origin: true,
+    origin: (origin, callback) => callback(null, !origin || allowedOrigins.has(origin)),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     exposedHeaders: ['Content-Disposition'],
@@ -48,7 +85,9 @@ export async function buildApp() {
   await app.register(rateLimitPlugin);
 
   // 📖 Register Swagger / OpenAPI Plugin (Interactive Docs at /api/v1/docs)
-  await app.register(swaggerPlugin);
+  if (env.NODE_ENV !== 'production') {
+    await app.register(swaggerPlugin);
+  }
 
   // 🔌 Register the Database Connection
   await app.register(prismaPlugin);
@@ -58,6 +97,13 @@ export async function buildApp() {
 
   // 🛡️ Register Global Error Handler Plugin
   await app.register(errorHandlerPlugin);
+
+  app.addHook('onSend', async (request, reply, payload) => {
+    if (request.url === '/api/v1/admin' || request.url.startsWith('/api/v1/admin/')) {
+      reply.header('Cache-Control', 'no-store');
+    }
+    return payload;
+  });
 
   // 🚀 Register Routes (API v1)
   // Login/logout use the admin API namespace, but remain outside adminRoutes
