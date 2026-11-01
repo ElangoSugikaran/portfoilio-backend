@@ -5,8 +5,8 @@ import { env } from '../config/env.js';
 
 /**
  * Global Error Handler Plugin
- * Captures all uncaught errors, Zod validation errors, Prisma errors,
- * and JWT auth errors across the Fastify application, transforming them into
+ * Captures all uncaught errors, Zod validation errors, and Prisma errors,
+ * transforming them into
  * a predictable JSON structure designed for frontend toaster notifications.
  */
 const errorHandlerPlugin: FastifyPluginAsync = async (server) => {
@@ -81,16 +81,7 @@ const errorHandlerPlugin: FastifyPluginAsync = async (server) => {
       }
     }
 
-    // 4. Handle JWT Authentication Errors
-    if ((error as any).code?.startsWith('FST_JWT_') || error.message.includes('authorization') || error.message.includes('token')) {
-      return reply.status(401).send({
-        success: false,
-        code: 'UNAUTHORIZED',
-        message: 'Authentication required. Please log in to continue.',
-      });
-    }
-
-    // 5. Default Internal Server Error (500)
+    // 4. Default Internal Server Error (500)
     request.log.error(error, 'Unhandled Server Exception');
     
     const statusCode = (error as FastifyError).statusCode || 500;
