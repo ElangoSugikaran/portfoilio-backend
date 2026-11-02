@@ -37,6 +37,9 @@ export async function buildApp() {
   const allowedOrigins = new Set(env.CORS_ORIGINS);
   const allowedAdminOrigins = new Set(env.ADMIN_ORIGINS);
 
+  // Render health checks and UptimeRobot (5-minute monitor) should ping /health.
+  app.get("/health", { config: { rateLimit: false } }, async () => ({ status: "ok" }));
+
   // Add Zod compilers
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
@@ -46,6 +49,8 @@ export async function buildApp() {
   await app.register(helmet, env.NODE_ENV === 'production' ? {} : { contentSecurityPolicy: false });
 
   app.addHook('onRequest', async (request, reply) => {
+    if (request.url === '/health') return;
+
     const origin = request.headers.origin;
     if (origin && !allowedOrigins.has(origin)) {
       return reply.status(403).send({
@@ -130,9 +135,15 @@ export async function buildApp() {
     };
   });
 
-  // Basic health-check route
-  app.get("/health", async () => {
-    return { status: "ok", message: "Server and DB are healthy!" };
+  // Database readiness check for diagnostics and deployment health checks.
+  app.get("/health/ready", { config: { rateLimit: false } }, async (_request, reply) => {
+    try {
+      await app.prisma.$queryRaw`SELECT 1`;
+      return { status: "ok" };
+    } catch (error) {
+      app.log.error({ err: error }, 'Database readiness check failed');
+      return reply.status(503).send({ status: "unavailable" });
+    }
   });
 
   return app;
